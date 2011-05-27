@@ -66,15 +66,29 @@ def getCatalogueForField(solver, srcSet, wcsIn, imageSize, filterName, idName, m
     for indexid in ids:
         X = solver.getCatalogue(ra, dec, radius, '', idName, indexid)
         if (len(X.refsources) != 0):
+            cols = solver.getTagAlongColumns(indexid)
+            colnames = [c.name for c in cols]
+
+            tagdata = []
+            for c in cols:
+                fname = 'getTagAlong' + c.ctype
+                func = getattr(solver, fname)
+                data = func(indexid, c.name, X.inds)
+                tagdata.append(data)
+
+            i_filter = colnames.index(filterName)
+
             X.indexid = indexid
             ref_new = []
             idx_new = []
-            for ref, idx in zip(X.refsources, X.inds):
+            for i, (ref, idx) in enumerate(zip(X.refsources, X.inds)):
                 ra = ref.getRa()/math.pi*180.
                 dec = ref.getDec()/math.pi*180.
                 pix = wcsIn.skyToPixel(ra, dec)
                 if (-margin < pix[0] < W+margin and \
                     -margin < pix[1] < H+margin):
+                    mag = tagdata[i_filter][i]
+                    ref.setPsfFlux(math.pow(10.0, -0.4*mag))
                     ref_new.append(ref)
                     idx_new.append(idx)
             X.refsources = ref_new
@@ -85,35 +99,19 @@ def queryReferenceCatalog(solver, srcSet, wcsIn, imageSize, filterName,
                           idName, margin=50):
     X = getCatalogueForField(solver, srcSet, wcsIn, imageSize, filterName, idName, margin)
     ref = X.refsources
-    indexid = X.indexid
-    inds = X.inds
     catSet = afwDet.SourceSet()
     if (len(ref) != 0):
-        cols = solver.getTagAlongColumns(indexid)
-        colnames = [c.name for c in cols]
-
-        tagdata = []
-        for c in cols:
-            fname = 'getTagAlong' + c.ctype
-            func = getattr(solver, fname)
-            data = func(indexid, c.name, inds)
-            tagdata.append(data)
-
-        i_filter = colnames.index(filterName)
-        i_id = colnames.index(idName)
         for i,r in enumerate(ref):
             ra = r.getRa()/math.pi*180.
             dec = r.getDec()/math.pi*180.
             p = wcsIn.skyToPixel(ra, dec)
-            mag = tagdata[i_filter][i]
+            mag = r.getPsfFlux()
             if (mag == mag):
                 s = afwDet.Source()
                 s.setXAstrom(p.getX())
                 s.setYAstrom(p.getY())
                 s.setRa(ra)
                 s.setDec(dec)
-                s.setId(tagdata[i_id][i])
-                s.setPsfFlux(math.pow(10.0, 10.-0.4*mag))
                 catSet.append(s)
 
     return catSet

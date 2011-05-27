@@ -65,42 +65,6 @@ std::vector<SourcePair> searchPair(std::vector<SourcePair> &a, SourcePair &p, do
     return v;
 }
 
-std::vector<SourcePair>::iterator searchPair2(std::vector<SourcePair> &a,
-					      const SourcePair &p,
-					      const double &e,
-					      const double &dpa,
-					      const double &e_dpa = 0.03) {
-    std::vector<SourcePair>::iterator idx = a.end();
-    double dd_min = 1.E+10;
-    double dpa_min = e_dpa;
-    std::vector<SourcePair> cand;
-
-    for (std::vector<SourcePair>::iterator i = a.begin(); i < a.end(); i++) {
-	double dd = fabs(i->distance - p.distance);
-	if (dd < e &&
-	    fabs(p.pa - i->pa - dpa) < e_dpa) {
-	    cand.push_back(*i);
-	}
-#if 1
-	if (dd < e &&
-	    fabs(p.pa - i->pa - dpa) < e_dpa &&
-	    dd < dd_min) {
-	    dd_min = dd;
-	    idx = i;
-	}
-#else
-	if (dd < e &&
-	    fabs(p.pa - i->pa - dpa) < dpa_min) {
-	    dpa_min = fabs(p.pa - i->pa - dpa);
-	    idx = i;
-	}
-#endif
-    }
-    //std::cout << "searchPair2: # of cand " << cand.size() << std::endl;
-
-    return idx;
-}
-
 std::vector<SourcePair>::iterator searchPair3(std::vector<SourcePair> &a,
 					      const SourcePair &p,
 					      const SourcePair &q,
