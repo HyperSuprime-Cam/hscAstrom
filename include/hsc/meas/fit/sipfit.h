@@ -12,12 +12,15 @@ namespace hsc {
         namespace fit {
 
 	    lsst::afw::image::Wcs::Ptr
-	    fitTANSIP(int order,
-		      std::vector<lsst::afw::detection::SourceMatch> const &matPair,
-		      lsst::afw::geom::PointD &crval,
-		      lsst::afw::geom::PointD &crpix,
-		      bool verbose = false);
+	      fitTANSIP(int order,
+			std::vector<lsst::afw::detection::SourceMatch> const &matPair,
+			lsst::afw::geom::PointD &crval,
+			lsst::afw::geom::PointD &crpix,
+			bool verbose = false);
 
+	    lsst::afw::image::Wcs::Ptr
+	      fitTAN(std::vector<lsst::afw::detection::SourceMatch> const &matPair,
+		     bool verbose = false);
 	}
     }
 }

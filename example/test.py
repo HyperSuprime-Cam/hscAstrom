@@ -180,8 +180,8 @@ if __name__ == '__main__':
     frames = ioMgr.inButler.queryMetadata('calexp', None, 'visit', dict(field=field,filter=filter))
     ccds = range(10)
 
-    frames = [126941]
-    ccds = [2]
+    frames = [126968]
+    ccds = [8]
 
     display = True
 

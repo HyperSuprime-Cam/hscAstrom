@@ -123,9 +123,8 @@ def runMatch(solver, wcsIn, srcSet, numBrightStars, imageSize, filterName, idNam
     matchList = hscMatch.match([s for s in srcSet if goodStar(s)], catSet, numBrightStars)
 
     order = 3
-    wcsOut = hscFit.fitTANSIP(order, matchList,
-                              wcsIn.getSkyOrigin().getPosition(),
-                              wcsIn.getPixelOrigin())
+    if len(matchList) != 0:
+        wcsOut = hscFit.fitTAN(matchList)
 
     if len(matchList) != 0:
         return True, wcsOut, matchList

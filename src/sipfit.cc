@@ -302,6 +302,149 @@ hsc::meas::fit::fitTANSIP(int order,
     cd *= R2D;
     lsst::afw::image::TanWcs wcs(crval, crpix, cd, sipA, sipB, sipAp, sipBp);
 
+    delete [] xorder;
+    delete [] yorder;
+    delete [] x;
+    delete [] y;
+    delete [] u;
+    delete [] v;
+
+    return wcs.clone();
+}
+
+lsst::afw::image::Wcs::Ptr
+hsc::meas::fit::fitTAN(std::vector<SourceMatch> const &matPair,
+		       bool verbose) {
+    int npair = matPair.size();
+    SourceSet img;
+    SourceSet cat;
+    double *x = new double[npair];
+    double *y = new double[npair];
+    double *u = new double[npair];
+    double *v = new double[npair];
+
+    double Sra = 0.0;
+    double Sdec = 0.0;
+    double Sx = 0.0;
+    double Sy = 0.0;
+    for (int i = 0; i < npair; i++) {
+	Sra  += matPair[i].first->getRa();
+	Sdec += matPair[i].first->getDec();
+	Sx += matPair[i].second->getXAstrom();
+	Sy += matPair[i].second->getYAstrom();
+    }
+    lsst::afw::geom::PointD crval = lsst::afw::geom::Point2D(Sra/npair, Sdec/npair);
+    lsst::afw::geom::PointD crpix = lsst::afw::geom::Point2D(Sx/npair, Sy/npair);
+
+    crval[0] *= D2R;
+    crval[1] *= D2R;
+
+    int order = 1;
+    int ncoeff = (order+1)*(order+2)/2 - 1;
+    int ndim = ncoeff * 2 + 2;
+
+    int *xorder = new int[ncoeff];
+    int *yorder = new int[ncoeff];
+
+    int n = 0;
+    for (int i = 1; i <= order; i++) {
+	for (int k = 0; k <= i; k++) {
+	    int j = i - k;
+	    xorder[n] = j;
+	    yorder[n] = k;
+	    n++;
+	}
+    }
+
+    double *a_data = new double[ndim*ndim];
+    double *b_data = new double[ndim];
+
+    for (int i = 0; i < ndim; i++) {
+	for (int j = 0; j < ndim; j++) {
+	    a_data[i*ndim+j] = 0.0;
+	}
+	b_data[i] = 0.0;
+    }
+
+    int iexp = 0; int nexp = 1;
+    double w1 = 1.0;
+    for (int i = 0; i < npair; i++) {
+	double ra = matPair[i].first->getRa() * D2R;
+	double dec = matPair[i].first->getDec() * D2R;
+	double xi    = calXi  (ra, dec, crval[0], crval[1]);
+	double xi_A  = calXi_A(ra, dec, crval[0], crval[1]);
+	double xi_D  = calXi_D(ra, dec, crval[0], crval[1]);
+	double eta   = calEta  (ra, dec, crval[0], crval[1]);
+	double eta_A = calEta_A(ra, dec, crval[0], crval[1]);
+	double eta_D = calEta_D(ra, dec, crval[0], crval[1]);
+	double u = matPair[i].second->getXAstrom() - crpix[0];
+	double v = matPair[i].second->getYAstrom() - crpix[1];
+	int i0 = ncoeff * 2 * iexp;
+	for (int k = 0; k < ncoeff; k++) {
+	    for (int l = 0; l < ncoeff; l++) {
+		a_data[(i0+k)*ndim+i0+l] += pow(u, xorder[k]) * pow(v, yorder[k]) *
+		                            pow(u, xorder[l]) * pow(v, yorder[l]) * w1;
+		a_data[(i0+ncoeff+k)*ndim+i0+ncoeff+l] += pow(u, xorder[k]) * pow(v, yorder[k]) *
+		                                          pow(u, xorder[l]) * pow(v, yorder[l]) * w1;
+	    }
+	    b_data[i0+k] += xi * pow(u, xorder[k]) * pow(v, yorder[k]) * w1;
+	    b_data[i0+ncoeff+k] += eta * pow(u, xorder[k]) * pow(v, yorder[k]) * w1;
+	}
+	int j0 = ncoeff * 2 * nexp;
+	for (int k = 0; k < ncoeff; k++) {
+	    a_data[(i0+k)*ndim+j0+iexp*2]          += -xi_A  * pow(u, xorder[k]) * pow(v, yorder[k]) * w1;
+	    a_data[(i0+k)*ndim+j0+iexp*2+1]        += -xi_D  * pow(u, xorder[k]) * pow(v, yorder[k]) * w1;
+	    a_data[(i0+ncoeff+k)*ndim+j0+iexp*2]   += -eta_A * pow(u, xorder[k]) * pow(v, yorder[k]) * w1;
+	    a_data[(i0+ncoeff+k)*ndim+j0+iexp*2+1] += -eta_D * pow(u, xorder[k]) * pow(v, yorder[k]) * w1;
+	    a_data[(j0+iexp*2)*ndim+i0+k]          = a_data[(i0+k)*ndim+j0+iexp*2];
+	    a_data[(j0+iexp*2+1)*ndim+i0+k]        = a_data[(i0+k)*ndim+j0+iexp*2+1];
+	    a_data[(j0+iexp*2)*ndim+i0+ncoeff+k]   = a_data[(i0+ncoeff+k)*ndim+j0+iexp*2];
+	    a_data[(j0+iexp*2+1)*ndim+i0+ncoeff+k] = a_data[(i0+ncoeff+k)*ndim+j0+iexp*2+1];
+	}
+	a_data[(j0+iexp*2)*ndim+j0+iexp*2]     += (xi_A * xi_A + eta_A * eta_A) * w1;
+	a_data[(j0+iexp*2)*ndim+j0+iexp*2+1]   += (xi_D * xi_A + eta_D * eta_A) * w1;
+	a_data[(j0+iexp*2+1)*ndim+j0+iexp*2]   += (xi_A * xi_D + eta_A * eta_D) * w1;
+	a_data[(j0+iexp*2+1)*ndim+j0+iexp*2+1] += (xi_D * xi_D + eta_D * eta_D) * w1;
+	
+	b_data[j0+iexp*2]   += -(xi * xi_A + eta * eta_A) * w1;
+	b_data[j0+iexp*2+1] += -(xi * xi_D + eta * eta_D) * w1;
+    }
+
+    gsl_matrix_view a = gsl_matrix_view_array(a_data, ndim, ndim);
+    gsl_vector_view b = gsl_vector_view_array(b_data, ndim);
+
+    gsl_vector *c = gsl_vector_alloc(ndim);
+
+    /*
+    gsl_permutation *p = gsl_permutation_alloc(ndim);
+
+    gsl_linalg_LU_decomp(&a.matrix, p, &s);
+    gsl_linalg_LU_solve(&a.matrix, p, &b.vector, c);
+    */
+    gsl_linalg_cholesky_decomp(&a.matrix);
+    gsl_linalg_cholesky_solve(&a.matrix, &b.vector, c);
+
+    if (verbose) {
+	for (int i = 0; i < ncoeff; i++) {
+	    printf("%2d %12.5e %12.5e\n", i, c->data[i], c->data[ncoeff+i]);
+	}
+	printf("\n");
+	printf("   %12.5e %12.5e\n", c->data[ncoeff*2], c->data[ncoeff*2+1]);
+	printf("\n");
+    }
+
+    crval[0] += c->data[ncoeff*2];
+    crval[1] += c->data[ncoeff*2+1];
+
+    Eigen::Matrix2d cd; cd << c->data[0], c->data[1], c->data[ncoeff], c->data[ncoeff+1];
+    
+    crval[0] *= R2D;
+    crval[1] *= R2D;
+    cd *= R2D;
+    lsst::afw::image::TanWcs wcs(crval, crpix, cd);
+
+    delete [] xorder;
+    delete [] yorder;
     delete [] x;
     delete [] y;
     delete [] u;
