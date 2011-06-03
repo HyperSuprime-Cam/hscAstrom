@@ -8,8 +8,7 @@ import lsst.afw.detection      as afwDet
 import lsst.daf.base           as dafBase
 import lsst.afw.coord          as afwCoord
 import lsst.afw.display.ds9    as ds9
-import hsc.meas.match.matchLib as hscMatch
-import hsc.meas.fit.fitLib     as hscFit
+import astromLib as hscAstrom
 
 try:
     import lsstDebug
@@ -120,11 +119,11 @@ def runMatch(solver, wcsIn, srcSet, numBrightStars, imageSize, filterName, idNam
     
     catSet = queryReferenceCatalog(solver, srcSet, wcsIn, imageSize, filterName, idName)
 
-    matchList = hscMatch.match([s for s in srcSet if goodStar(s)], catSet, numBrightStars)
+    matchList = hscAstrom.match([s for s in srcSet if goodStar(s)], catSet, numBrightStars)
 
     order = 3
     if len(matchList) != 0:
-        wcsOut = hscFit.fitTAN(matchList)
+        wcsOut = hscAstrom.fitTAN(matchList)
 
     if len(matchList) != 0:
         return True, wcsOut, matchList

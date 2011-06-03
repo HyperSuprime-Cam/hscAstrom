@@ -1,12 +1,12 @@
 #include "fitsio.h"
 
-#include "hsc/meas/fit/sipfit.h"
+#include "hsc/meas/astrom/sipfit.h"
 #include "lsst/afw/detection/Source.h"
 
 #define D2R (M_PI/180.)
 #define R2D (180./M_PI)
 
-using namespace hsc::meas::fit;
+using namespace hsc::meas::astrom;
 using namespace lsst::afw::detection;
 
 #include <gsl/gsl_linalg.h>
@@ -112,7 +112,7 @@ double *sipfit(int order,
 }
 
 lsst::afw::image::Wcs::Ptr
-hsc::meas::fit::fitTANSIP(int order,
+hsc::meas::astrom::fitTANSIP(int order,
 			  std::vector<SourceMatch> const &matPair,
 			  lsst::afw::geom::PointD &crvalo,
 			  lsst::afw::geom::PointD &crpixo,
@@ -313,7 +313,7 @@ hsc::meas::fit::fitTANSIP(int order,
 }
 
 lsst::afw::image::Wcs::Ptr
-hsc::meas::fit::fitTAN(std::vector<SourceMatch> const &matPair,
+hsc::meas::astrom::fitTAN(std::vector<SourceMatch> const &matPair,
 		       bool verbose) {
     int npair = matPair.size();
     SourceSet img;

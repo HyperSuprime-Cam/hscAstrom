@@ -9,7 +9,7 @@
 
 namespace hsc {
   namespace meas {
-    namespace match {
+    namespace astrom {
 
 	struct SourcePair {
 	    lsst::afw::detection::Source::Ptr first;

@@ -1,8 +1,0 @@
-# -*- python -*-
-import re
-Import("env")
-
-env.CheckSwig("python", ilang="c++", includedProducts="hscAstrom ndarray afw utils daf_base pex_exceptions pex_policy daf_persistence pex_logging daf_data security")
-env.LoadableModuleIncomplete("_fitLib", Split("fitLib.i"),
-                             CCFLAGS=re.sub("-Wall", "", " ".join(env['CCFLAGS'])),
-                             LIBS=env.getlibs("hscastrom"))

@@ -9,7 +9,7 @@
 
 namespace hsc {
     namespace meas {
-        namespace fit {
+        namespace astrom {
 
 	    lsst::afw::image::Wcs::Ptr
 	      fitTANSIP(int order,

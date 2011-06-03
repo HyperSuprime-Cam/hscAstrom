@@ -39,8 +39,7 @@ env.libs["hscastrom"] += env.getlibs("pex_exceptions ndarray afw boost utils daf
 
 for d in (
     "lib",
-    "python/hsc/meas/match",
-    "python/hsc/meas/fit",
+    "python/hsc/meas/astrom",
 #    "example",
 ):
     SConscript(os.path.join(d, "SConscript"))

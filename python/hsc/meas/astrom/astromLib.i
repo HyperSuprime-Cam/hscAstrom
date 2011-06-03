@@ -1,12 +1,12 @@
 // -*- lsst-c++ -*-
-%define matchLib_DOCSTRING
+%define astromLib_DOCSTRING
 "
 Python interface to hsc::meas::match
 "
 %enddef
 
 %feature("autodoc", "1");
-%module(package="hsc.meas.match", docstring=matchLib_DOCSTRING) matchLib
+%module(package="hsc.meas.astrom", docstring=astromLib_DOCSTRING) astromLib
 
 %{
 #include "lsst/afw/image.h"
@@ -17,7 +17,7 @@ Python interface to hsc::meas::match
 %pythoncode %{
 import lsst.utils
 
-def version(HeadURL = r"$HeadURL: ssh://hsc-gw2.mtk.nao.ac.jp/ana/hgrepo/hscAstrom/python/hsc/meas/match/matchLib.i $"):
+def version(HeadURL = r"$HeadURL: ssh://hsc-gw2.mtk.nao.ac.jp/ana/hgrepo/hscAstrom/python/hsc/meas/astrom/astromLib.i $"):
     version_svn = lsst.utils.guessSvnVersion(HeadURL)
 
     try:
@@ -39,3 +39,4 @@ def version(HeadURL = r"$HeadURL: ssh://hsc-gw2.mtk.nao.ac.jp/ana/hgrepo/hscAstr
 %import "lsst/afw/detection/detectionLib.i"
 
 %include "match.i"
+%include "sipfit.i"

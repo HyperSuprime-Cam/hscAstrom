@@ -4,14 +4,14 @@
 #include <cmath>
 #include <fstream>
 #include <gsl/gsl_linalg.h>
-#include "hsc/meas/match/match.h"
+#include "hsc/meas/astrom/match.h"
 
 #include "boost/scoped_array.hpp"
 
 #define D2R (M_PI/180.)
 #define R2D (180./M_PI)
 
-using namespace hsc::meas::match;
+using namespace hsc::meas::astrom;
 using namespace lsst::afw::detection;
 
 // Algorithm is based on V.Tabur 2007, PASA, 24, 189-198
@@ -27,7 +27,7 @@ bool cmpPair(SourcePair const &a, SourcePair const &b) {
     return a.distance > b.distance;
 }
 
-SourceSet hsc::meas::match::selectPoint(SourceSet const &a,
+SourceSet hsc::meas::astrom::selectPoint(SourceSet const &a,
 					int num,
 					int start) {
     // copy and sort array of pointers on psfFlux
@@ -56,7 +56,9 @@ std::vector<SourcePair> searchPair(std::vector<SourcePair> &a, SourcePair &p, do
 
     for (size_t i = 0; i < a.size(); i++) {
 	double dd = fabs(a[i].distance - p.distance);
-	if (dd < e) {
+	double dpa = fabs(a[i].pa - p.pa);
+	if (dd < e && dpa < 0.03) {
+//	if (dd < e) {
 	    a[i].deltaD = dd;
 	    v.push_back(a[i]);
 	}
@@ -73,7 +75,7 @@ std::vector<SourcePair>::iterator searchPair3(std::vector<SourcePair> &a,
 					      const double &e_dpa = 0.03) {
     std::vector<SourcePair>::iterator idx = a.end();
     double dd_min = 1.E+10;
-    double dpa_min = e_dpa;
+    //double dpa_min = e_dpa;
 
     for (std::vector<SourcePair>::iterator i = a.begin(); i < a.end(); i++) {
 	double dd = fabs(i->distance - p.distance);
@@ -318,7 +320,7 @@ std::vector<SourceMatch> FinalVerify(double *coeff,
     return matPair;
 }
 
-std::vector<SourceMatch> hsc::meas::match::match(SourceSet const &src,
+std::vector<SourceMatch> hsc::meas::astrom::match(SourceSet const &src,
 						 SourceSet const &cat,
 						 int numBrightStars,
 						 bool verbose) {
