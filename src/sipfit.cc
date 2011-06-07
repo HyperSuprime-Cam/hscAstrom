@@ -113,10 +113,10 @@ double *sipfit(int order,
 
 lsst::afw::image::Wcs::Ptr
 hsc::meas::astrom::fitTANSIP(int order,
-			  std::vector<SourceMatch> const &matPair,
-			  lsst::afw::geom::PointD &crvalo,
-			  lsst::afw::geom::PointD &crpixo,
-			  bool verbose) {
+			     std::vector<SourceMatch> const &matPair,
+			     lsst::afw::coord::Coord::Ptr &crvalo,
+			     lsst::afw::geom::PointD &crpixo,
+			     bool verbose) {
     int npair = matPair.size();
     SourceSet img;
     SourceSet cat;
@@ -129,10 +129,7 @@ hsc::meas::astrom::fitTANSIP(int order,
     double ra, dec;
 
     lsst::afw::geom::PointD crpix = crpixo;
-    lsst::afw::geom::PointD crval = crvalo;
-
-    crval[0] *= D2R;
-    crval[1] *= D2R;
+    lsst::afw::geom::PointD crval = crvalo->getPosition(lsst::afw::coord::RADIANS);
 
     int ncoeff = (order+1)*(order+2)/2 - 1;
     double *coeff = NULL;
@@ -164,8 +161,8 @@ hsc::meas::astrom::fitTANSIP(int order,
     int iexp = 0; int nexp = 1;
     double w1 = 1.0;
     for (int i = 0; i < npair; i++) {
-	ra = matPair[i].first->getRa() * D2R;
-	dec = matPair[i].first->getDec() * D2R;
+	ra = matPair[i].first->getRa();
+	dec = matPair[i].first->getDec();
 	double xi    = calXi  (ra, dec, crval[0], crval[1]);
 	double xi_A  = calXi_A(ra, dec, crval[0], crval[1]);
 	double xi_D  = calXi_D(ra, dec, crval[0], crval[1]);
@@ -314,7 +311,7 @@ hsc::meas::astrom::fitTANSIP(int order,
 
 lsst::afw::image::Wcs::Ptr
 hsc::meas::astrom::fitTAN(std::vector<SourceMatch> const &matPair,
-		       bool verbose) {
+			  bool verbose) {
     int npair = matPair.size();
     SourceSet img;
     SourceSet cat;
@@ -335,9 +332,6 @@ hsc::meas::astrom::fitTAN(std::vector<SourceMatch> const &matPair,
     }
     lsst::afw::geom::PointD crval = lsst::afw::geom::Point2D(Sra/npair, Sdec/npair);
     lsst::afw::geom::PointD crpix = lsst::afw::geom::Point2D(Sx/npair, Sy/npair);
-
-    crval[0] *= D2R;
-    crval[1] *= D2R;
 
     int order = 1;
     int ncoeff = (order+1)*(order+2)/2 - 1;
@@ -369,8 +363,8 @@ hsc::meas::astrom::fitTAN(std::vector<SourceMatch> const &matPair,
     int iexp = 0; int nexp = 1;
     double w1 = 1.0;
     for (int i = 0; i < npair; i++) {
-	double ra = matPair[i].first->getRa() * D2R;
-	double dec = matPair[i].first->getDec() * D2R;
+	double ra = matPair[i].first->getRa();
+	double dec = matPair[i].first->getDec();
 	double xi    = calXi  (ra, dec, crval[0], crval[1]);
 	double xi_A  = calXi_A(ra, dec, crval[0], crval[1]);
 	double xi_D  = calXi_D(ra, dec, crval[0], crval[1]);
@@ -415,6 +409,7 @@ hsc::meas::astrom::fitTAN(std::vector<SourceMatch> const &matPair,
 
     gsl_vector *c = gsl_vector_alloc(ndim);
 
+    //int s;
     /*
     gsl_permutation *p = gsl_permutation_alloc(ndim);
 

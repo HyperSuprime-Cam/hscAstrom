@@ -59,12 +59,18 @@ def getCatalogueForField(solver, srcSet, wcsIn, imageSize, filterName, idName, m
 
     deltaRa, deltaDec = getImageSizeInDegree(srcSet, wcsIn)
 
-    radius = max(deltaRa, deltaDec) * 3600. * 1.1
+    radius = max(deltaRa, deltaDec) * 3600.
 
     ids = solver.getIndexIdList()
+    indexid_new = []
+    ref_new = []
+    idx_new = []
     for indexid in ids:
+        if indexid % 10 != 0:
+            continue;
         X = solver.getCatalogue(ra, dec, radius, '', idName, indexid)
-        if (len(X.refsources) != 0):
+        if len(X.refsources) != 0:
+            indexid_new.append(indexid)
             cols = solver.getTagAlongColumns(indexid)
             colnames = [c.name for c in cols]
 
@@ -77,9 +83,6 @@ def getCatalogueForField(solver, srcSet, wcsIn, imageSize, filterName, idName, m
 
             i_filter = colnames.index(filterName)
 
-            X.indexid = indexid
-            ref_new = []
-            idx_new = []
             for i, (ref, idx) in enumerate(zip(X.refsources, X.inds)):
                 ra = ref.getRa()/math.pi*180.
                 dec = ref.getDec()/math.pi*180.
@@ -90,9 +93,11 @@ def getCatalogueForField(solver, srcSet, wcsIn, imageSize, filterName, idName, m
                     ref.setPsfFlux(math.pow(10.0, -0.4*mag))
                     ref_new.append(ref)
                     idx_new.append(idx)
-            X.refsources = ref_new
-            X.inds = idx_new
-            return X
+
+    X.indexid = indexid_new[0]
+    X.refsources = ref_new
+    X.inds = idx_new
+    return X
 
 def queryReferenceCatalog(solver, srcSet, wcsIn, imageSize, filterName,
                           idName, margin=50):
@@ -101,12 +106,13 @@ def queryReferenceCatalog(solver, srcSet, wcsIn, imageSize, filterName,
     catSet = afwDet.SourceSet()
     if (len(ref) != 0):
         for i,r in enumerate(ref):
-            ra = r.getRa()/math.pi*180.
-            dec = r.getDec()/math.pi*180.
-            p = wcsIn.skyToPixel(ra, dec)
+            ra = r.getRa()
+            dec = r.getDec()
+            p = wcsIn.skyToPixel(ra/math.pi*180., dec/math.pi*180.)
             mag = r.getPsfFlux()
             if (mag == mag):
                 s = afwDet.Source()
+                s.setId(r.getId())
                 s.setXAstrom(p.getX())
                 s.setYAstrom(p.getY())
                 s.setRa(ra)
@@ -119,9 +125,9 @@ def runMatch(solver, wcsIn, srcSet, numBrightStars, imageSize, filterName, idNam
     
     catSet = queryReferenceCatalog(solver, srcSet, wcsIn, imageSize, filterName, idName)
 
-    matchList = hscAstrom.match([s for s in srcSet if goodStar(s)], catSet, numBrightStars)
+    srcSet2 = [s for s in srcSet if goodStar(s)]
+    matchList = hscAstrom.match(srcSet2, catSet, numBrightStars)
 
-    order = 3
     if len(matchList) != 0:
         wcsOut = hscAstrom.fitTAN(matchList)
 
@@ -210,11 +216,11 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
     elif dscale is not None:
         isSolved = solver.solve(wcsIn, dscale)
     else:
+#        isSolved = solver.solve(wcsIn)
         isSolved, wcs, matchList = runMatch(solver, wcsIn, sourceSet,
                             min(policy.get('numBrightStars'), len(sourceSet)),
                             (W,H), filterName, measAst.getIdColumn(policy))
         log.log(log.INFO, "Found %d matches in hscAstrom" % len(matchList))
-#        isSolved = solver.solve(wcsIn)
 
     # Did we solve?
     log.log(log.DEBUG, 'Finished astrometric solution')
