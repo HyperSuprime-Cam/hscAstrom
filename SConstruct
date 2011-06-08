@@ -6,7 +6,7 @@ import glob, os.path, sys, traceback
 import lsst.SConsUtils as scons
 
 env = scons.makeEnv(
-    "hscastrom",
+    "hscAstrom",
     "hg",
     [
 #        ["boost", "boost/version.hpp", "boost_system:C++"],
@@ -35,7 +35,7 @@ env = scons.makeEnv(
     ],
 )
 
-env.libs["hscastrom"] += env.getlibs("pex_exceptions ndarray afw boost utils daf_base daf_data daf_persistence pex_logging pex_policy security")
+env.libs["hscAstrom"] += env.getlibs("pex_exceptions ndarray afw boost utils daf_base daf_data daf_persistence pex_logging pex_policy security")
 
 for d in (
     "lib",
