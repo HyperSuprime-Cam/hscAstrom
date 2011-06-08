@@ -7,7 +7,7 @@ import lsst.SConsUtils as scons
 
 env = scons.makeEnv(
     "hscastrom",
-    r"$HeadURL: FILL IN PATH /hscAstrom/trunk/SConstruct $",
+    "hg",
     [
 #        ["boost", "boost/version.hpp", "boost_system:C++"],
 #        ["boost", "boost/version.hpp", "boost_filesystem:C++"],
@@ -43,6 +43,15 @@ for d in (
 #    "example",
 ):
     SConscript(os.path.join(d, "SConscript"))
+
+Alias("install", [
+    env.Install(env['prefix'], "example"),
+    env.Install(env['prefix'], "include"),
+    env.Install(env['prefix'], "lib"),
+    env.Install(env['prefix'], "python"),
+    env.Install(env['prefix'], "src"),
+    env.InstallEups(os.path.join(env['prefix'], "ups")),
+])
 
 scons.CleanTree(r"*~ core *.so *.os *.o *.pyc config.log")
 
