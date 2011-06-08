@@ -1,3 +1,28 @@
+diff -ru -x .svn -x ups -x runHsc.py /data/ana/products/Linux64/pipette/HSC-DC2.9/policy/hsc.paf /home/yasuda/soft/price-DC2/pipette/HSC-DC2.9/policy/hsc.paf
+--- /data/ana/products/Linux64/pipette/HSC-DC2.9/policy/hsc.paf	2011-05-13 09:05:38.626033000 +0900
++++ /home/yasuda/soft/price-DC2/pipette/HSC-DC2.9/policy/hsc.paf	2011-06-08 11:18:58.000000000 +0900
+@@ -82,7 +82,7 @@
+ 
+ astrometry: {
+     defaultFilterName: R
+-    numBrightStars: 200
++    numBrightStars: 100
+     sipOrder: 4
+     calculateSip: true
+     starGalaxyColumnName: "starnotgal"
+diff -ru -x .svn -x ups -x runHsc.py /data/ana/products/Linux64/pipette/HSC-DC2.9/policy/suprimecam.paf /home/yasuda/soft/price-DC2/pipette/HSC-DC2.9/policy/suprimecam.paf
+--- /data/ana/products/Linux64/pipette/HSC-DC2.9/policy/suprimecam.paf	2011-05-13 09:05:38.647032000 +0900
++++ /home/yasuda/soft/price-DC2/pipette/HSC-DC2.9/policy/suprimecam.paf	2011-06-02 08:39:53.000000000 +0900
+@@ -145,7 +145,7 @@
+ 
+ astrometry: {
+     defaultFilterName: r
+-    numBrightStars: 200
++    numBrightStars: 100
+     sipOrder: 2
+     starGalaxyColumnName: "starnotgal"
+     magErrorColumnPattern: "%(filter)s_err"
+diff -ru -x .svn -x ups -x runHsc.py /data/ana/products/Linux64/pipette/HSC-DC2.9/python/lsst/pipette/calibrate.py /home/yasuda/soft/price-DC2/pipette/HSC-DC2.9/python/lsst/pipette/calibrate.py
 --- /data/ana/products/Linux64/pipette/HSC-DC2.9/python/lsst/pipette/calibrate.py	2011-05-13 09:05:39.151013000 +0900
 +++ /home/yasuda/soft/price-DC2/pipette/HSC-DC2.9/python/lsst/pipette/calibrate.py	2011-06-07 14:01:07.000000000 +0900
 @@ -19,6 +19,7 @@
