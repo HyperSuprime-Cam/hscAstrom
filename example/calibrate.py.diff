@@ -1,0 +1,47 @@
+--- /data/ana/products/Linux64/pipette/HSC-DC2.9/python/lsst/pipette/calibrate.py	2011-05-13 09:05:39.151013000 +0900
++++ /home/yasuda/soft/price-DC2/pipette/HSC-DC2.9/python/lsst/pipette/calibrate.py	2011-06-07 14:01:07.000000000 +0900
+@@ -19,6 +19,7 @@
+ import lsst.pipette.phot as pipPhot
+ import lsst.pipette.background as pipBackground
+ import lsst.pipette.distortion as pipDist
++import hsc.meas.astrom as hscAst
+ 
+ class Calibrate(pipProc.Process):
+     def __init__(self, Repair=pipRepair.Repair, Photometry=pipPhot.Photometry,
+@@ -235,6 +236,11 @@
+         """
+         assert exposure, "No exposure provided"
+         ccd = pipUtil.getCcd(exposure)
++        if 'class' in self.config['distortion']:
++            if self.config['distortion']['class'].find('HscDistortion') != -1:
++                position = ccd.getCenter()
++                center = ccd.getSize() / ccd.getPixelSize() / 2.0
++                ccd.setCenter(position+center)
+         dist = pipDist.createDistortion(ccd, self.config['distortion'])
+         return dist
+ 
+@@ -293,8 +299,13 @@
+         self.display('astrometry', exposure=exposure, sources=distSources, pause=True)
+ 
+         log = pexLog.Log(self.log, "astrometry")
+-        astrom = measAst.determineWcs(self.config['astrometry'].getPolicy(), exposure, distSources,
+-                                      log=log, forceImageSize=size, filterName=filterName)
++        exposure.getWcs().shiftReferencePixel(-xMin, -yMin)
++#        astrom = measAst.determineWcs(self.config['astrometry'].getPolicy(), exposure, distSources,
++#                                      log=log, forceImageSize=size, filterName=filterName)
++        astrom = hscAst.determineWcs(self.config['astrometry'].getPolicy(), exposure, distSources,
++                                     log=log, forceImageSize=size, filterName=filterName)
++        exposure.getWcs().shiftReferencePixel(xMin, yMin)
++
+         if astrom is None:
+             raise RuntimeError("Unable to solve astrometry for %s", exposure.getDetector().getId())
+         wcs = astrom.getWcs()
+@@ -308,7 +319,7 @@
+         # Apply WCS to sources
+         for index, source in enumerate(sources):
+             distSource = distSources[index]
+-            sky = wcs.pixelToSky(distSource.getXAstrom() - xMin, distSource.getYAstrom() - yMin)
++            sky = wcs.pixelToSky(distSource.getXAstrom(), distSource.getYAstrom())
+             source.setRaDec(sky)
+ 
+         self.display('astrometry', exposure=exposure, sources=sources, matches=matches, pause=True)
