@@ -126,7 +126,10 @@ def runMatch(solver, wcsIn, srcSet, numBrightStars, imageSize, filterName, idNam
     catSet = queryReferenceCatalog(solver, srcSet, wcsIn, imageSize, filterName, idName)
 
     srcSet2 = [s for s in srcSet if goodStar(s)]
-    matchList = hscAstrom.match(srcSet2, catSet, numBrightStars)
+    minNumMatchedPair = 30
+    matchList = hscAstrom.match(srcSet2, catSet,
+                                numBrightStars,
+                                minNumMatchedPair)
 
     if len(matchList) != 0:
         wcsOut = hscAstrom.fitTAN(matchList)
@@ -220,7 +223,8 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
         isSolved, wcs, matchList = runMatch(solver, wcsIn, sourceSet,
                             min(policy.get('numBrightStars'), len(sourceSet)),
                             (W,H), filterName, measAst.getIdColumn(policy))
-        log.log(log.INFO, "Found %d matches in hscAstrom" % 0 if matchList is None else len(matchList))
+        if isSolved:
+            log.log(log.INFO, "Found %d matches in hscAstrom" % 0 if matchList is None else len(matchList))
 
     # Did we solve?
     log.log(log.DEBUG, 'Finished astrometric solution')

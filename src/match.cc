@@ -255,6 +255,7 @@ SourceSet::const_iterator searchNearestPoint(SourceSet const &cat, double& x, do
 std::vector<SourceMatch> FinalVerify(double *coeff,
 				     SourceSet const &src,
 				     SourceSet const &cat,
+				     double matchingAllowanceInPixel,
 				     bool verbose) {
     SourceSet srcMat;
     SourceSet catMat;
@@ -266,7 +267,7 @@ std::vector<SourceMatch> FinalVerify(double *coeff,
 	x0 = src[i]->getXAstrom();
 	y0 = src[i]->getYAstrom();
 	transform(1, coeff, x0, y0, &x1, &y1);
-	double e = 10.0;
+	double e = matchingAllowanceInPixel;
 	SourceSet::const_iterator p = searchNearestPoint(cat, x1, y1, e);
 	if (p != cat.end()) {
 	    num++;
@@ -289,7 +290,7 @@ std::vector<SourceMatch> FinalVerify(double *coeff,
 		x0 = src[i]->getXAstrom();
 		y0 = src[i]->getYAstrom();
 		transform(order, coeff, x0, y0, &x1, &y1);
-		double e = 10.0;
+		double e = matchingAllowanceInPixel;
 		SourceSet::const_iterator p = searchNearestPoint(cat, x1, y1, e);
 		if (p != cat.end()) {
 		    num++;
@@ -320,15 +321,19 @@ std::vector<SourceMatch> FinalVerify(double *coeff,
     return matPair;
 }
 
-std::vector<SourceMatch> hsc::meas::astrom::match(SourceSet const &src,
-						 SourceSet const &cat,
-						 int numBrightStars,
-						 bool verbose) {
+std::vector<SourceMatch>
+hsc::meas::astrom::match(SourceSet const &src,
+			 SourceSet const &cat,
+			 int numBrightStars,
+			 int minNumMatchedPair,
+			 double matchingAllowanceInPixel,
+			 double offsetAllowedInPixel,
+			 bool verbose) {
     // Select brightest Nsub stars from list of objects
     // Process both detected from image and external catalog
     int Nsub = numBrightStars;
     SourceSet srcSub = selectPoint(src, Nsub);
-    SourceSet catSub = selectPoint(cat, Nsub+25);
+    SourceSet catSub = selectPoint(cat, srcSub.size()+25);
 
     unsigned int catSize = catSub.size();
     /*
@@ -352,7 +357,7 @@ std::vector<SourceMatch> hsc::meas::astrom::match(SourceSet const &src,
     std::vector<SourceMatch> matPair;
 
     size_t m = 5;		// Number of objects to define the shape
-    double e = 10.0;		// Error allowed for matching
+    double e = matchingAllowanceInPixel; // Error allowed for matching
     for (size_t i = 0; i < srcSub.size()-1; i++) {
 	for (size_t j = i+1; j < srcSub.size(); j++) {
 	    SourcePair p(srcSub[i], srcSub[j]);
@@ -433,7 +438,7 @@ std::vector<SourceMatch> hsc::meas::astrom::match(SourceSet const &src,
 			//std::cout << std::endl;
 
 			if (fabs(coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1.) > 0.008 ||
-			    fabs(coeff[0]) > 100 || fabs(coeff[3]) > 100) {
+			    fabs(coeff[0]) > offsetAllowedInPixel || fabs(coeff[3]) > offsetAllowedInPixel) {
 			    delete [] coeff;
 			    continue;
 			} else {
@@ -446,8 +451,8 @@ std::vector<SourceMatch> hsc::meas::astrom::match(SourceSet const &src,
 			    for (size_t k = 1; k < srcMat.size(); k++) {
 				//std::cout << "line(" << catMat[0]->getXAstrom() << "," << catMat[0]->getYAstrom() << "," << catMat[k]->getXAstrom() << "," << catMat[k]->getYAstrom() << ") # line=0 0 color=red" << std::endl;
 			    }
-			    matPair = FinalVerify(coeff, src, cat, verbose);
-			    if (matPair.size() <= 50) {
+			    matPair = FinalVerify(coeff, src, cat, matchingAllowanceInPixel, verbose);
+			    if (matPair.size() <= minNumMatchedPair) {
 				delete [] coeff;
 				continue;
 			    } else {
