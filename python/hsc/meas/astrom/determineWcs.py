@@ -94,6 +94,9 @@ def getCatalogueForField(solver, srcSet, wcsIn, imageSize, filterName, idName, m
                     ref_new.append(ref)
                     idx_new.append(idx)
 
+    if len(indexid_new) == 0:
+        raise RuntimeError("Reference catalogue is empty (%f,%f,%f)" % (ra, dec, radius))
+
     X.indexid = indexid_new[0]
     X.refsources = ref_new
     X.inds = idx_new
