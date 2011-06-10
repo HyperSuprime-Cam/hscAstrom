@@ -32,14 +32,19 @@ namespace hsc {
 	};
 	    
 
-	lsst::afw::detection::SourceSet selectPoint(lsst::afw::detection::SourceSet const &a,
-						    int n,
-						    int start = 0);
+	lsst::afw::detection::SourceSet
+	  selectPoint(lsst::afw::detection::SourceSet const &a,
+		      int n,
+		      int start = 0);
 
-	std::vector<lsst::afw::detection::SourceMatch> match(lsst::afw::detection::SourceSet const &src,
-							     lsst::afw::detection::SourceSet const &cat,
-							     int numBrightStars = 100,
-							     bool verbose = false);
+	std::vector<lsst::afw::detection::SourceMatch>
+	  match(lsst::afw::detection::SourceSet const &src,
+		lsst::afw::detection::SourceSet const &cat,
+		int numBrightStars = 100,
+		int minNumMatchedPair = 50,
+		double matchingAllowanceInPixel = 10.,
+		double offsetAllowedInPixel = 300.,
+		bool verbose = false);
     }
   }
 }
