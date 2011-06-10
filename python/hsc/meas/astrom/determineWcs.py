@@ -220,7 +220,7 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
         isSolved, wcs, matchList = runMatch(solver, wcsIn, sourceSet,
                             min(policy.get('numBrightStars'), len(sourceSet)),
                             (W,H), filterName, measAst.getIdColumn(policy))
-        log.log(log.INFO, "Found %d matches in hscAstrom" % len(matchList))
+        log.log(log.INFO, "Found %d matches in hscAstrom" % 0 if matchList is None else len(matchList))
 
     # Did we solve?
     log.log(log.DEBUG, 'Finished astrometric solution')
