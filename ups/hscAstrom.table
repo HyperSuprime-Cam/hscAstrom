@@ -1,4 +1,10 @@
-setupRequired(pipette)
+setupOptional(gcc)
+setupRequired(python)
+
+setupRequired(boost)
+setupRequired(gsl)
+setupRequired(afw)
+setupRequired(swig)
 
 envPrepend(LD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
 envPrepend(DYLD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
