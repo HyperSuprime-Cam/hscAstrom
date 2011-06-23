@@ -124,11 +124,14 @@ def queryReferenceCatalog(solver, srcSet, wcsIn, imageSize, filterName,
 
     return catSet
 
-def runMatch(solver, wcsIn, srcSet, numBrightStars, imageSize, filterName, idName):
+def runMatch(solver, wcsIn, srcSet, numBrightStars, imageSize, filterName, idName, log=None):
     
     catSet = queryReferenceCatalog(solver, srcSet, wcsIn, imageSize, filterName, idName)
+    if log is not None: log.log(log.INFO, "Retrieved %d reference catalog sources" % len(catSet))
 
     srcSet2 = [s for s in srcSet if goodStar(s)]
+    if log is not None: log.log(log.INFO, "Matching to %d good input sources" % len(srcSet2))
+
     minNumMatchedPair = 30
     matchList = hscAstrom.match(srcSet2, catSet,
                                 numBrightStars,
@@ -225,15 +228,15 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
 #        isSolved = solver.solve(wcsIn)
         isSolved, wcs, matchList = runMatch(solver, wcsIn, sourceSet,
                             min(policy.get('numBrightStars'), len(sourceSet)),
-                            (W,H), filterName, measAst.getIdColumn(policy))
+                            (W,H), filterName, measAst.getIdColumn(policy), log=log)
         if isSolved:
             log.log(log.INFO, "Found %d matches in hscAstrom" % (0 if matchList is None else len(matchList)))
 
     # Did we solve?
     log.log(log.DEBUG, 'Finished astrometric solution')
     if not isSolved:
-        log.log(log.WARN, "No astrometric solution found, using input WCS")
-        return astrom
+        log.log(log.WARN, "No astrometric solution found")
+        return None
 #    wcs = solver.getWcs()
 
     # Generate a list of catalogue objects in the field.
