@@ -46,8 +46,8 @@ def getImageSizeInDegree(srcSet, wcs):
     llc = wcs.pixelToSky(minx, miny).getPosition()
     urc = wcs.pixelToSky(maxx, maxy).getPosition()
     
-    deltaRa  = llc.getX() - urc.getX()
-    deltaDec = urc.getY() - llc.getY()
+    deltaRa  = math.fabs(llc.getX() - urc.getX())
+    deltaDec = math.fabs(urc.getY() - llc.getY())
     
     return deltaRa, deltaDec
 
@@ -57,9 +57,11 @@ def getCatalogueForField(solver, srcSet, wcsIn, imageSize, filterName, idName, m
     ra = skyCenter.getX()
     dec = skyCenter.getY()
 
-    deltaRa, deltaDec = getImageSizeInDegree(srcSet, wcsIn)
+    #deltaRa, deltaDec = getImageSizeInDegree(srcSet, wcsIn)
 
-    radius = max(deltaRa, deltaDec) * 3600.
+    #radius = max(deltaRa, deltaDec) * 3600.
+
+    radius = max(W, H) * wcsIn.pixelScale()
 
     ids = solver.getIndexIdList()
     indexid_new = []

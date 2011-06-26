@@ -334,6 +334,7 @@ hsc::meas::astrom::match(SourceSet const &src,
     int Nsub = numBrightStars;
     SourceSet srcSub = selectPoint(src, Nsub);
     SourceSet catSub = selectPoint(cat, srcSub.size()+25);
+    //std::cout << srcSub.size() << " " << catSub.size() << std::endl;
 
     unsigned int catSize = catSub.size();
     /*
@@ -452,6 +453,7 @@ hsc::meas::astrom::match(SourceSet const &src,
 				//std::cout << "line(" << catMat[0]->getXAstrom() << "," << catMat[0]->getYAstrom() << "," << catMat[k]->getXAstrom() << "," << catMat[k]->getYAstrom() << ") # line=0 0 color=red" << std::endl;
 			    }
 			    matPair = FinalVerify(coeff, src, cat, matchingAllowanceInPixel, verbose);
+			    //std::cout << matPair.size() << std::endl;
 			    if (matPair.size() <= minNumMatchedPair) {
 				delete [] coeff;
 				continue;

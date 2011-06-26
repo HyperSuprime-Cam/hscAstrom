@@ -1,3 +1,4 @@
+import os, sys
 import lsst.pipette.readwrite           as pipReadWrite
 import lsst.obs.suprimecam              as obsSc
 import lsst.afw.image                   as afwImage
@@ -7,159 +8,123 @@ import hsc.meas.astrom                  as hscAst
 import lsst.meas.algorithms             as measAlg
 import lsst.pipette.util as pipUtil
 import lsst.pipette.distortion as pipDist
-import hsc.meas.match.matchLib as hscMatch
 import math
 import datetime
 import lsst.pex.policy as policy
 import lsst.meas.astrom as measAst
 from lsst.pex.logging import Log
-
-class SDSSstar:
-    def __init__(self, ra, dec):
-        self.ra = ra
-        self.dec = dec
-        self.values = {}
-
-def queryReferenceCatalog(ra, dec, deltaRa, deltaDec):
-# ra, dec, deltaRa and deltaDec in degree
-    radius = max(deltaRa, deltaDec) * 3600.
-
-    log = Log.getDefaultLog()
-#    log.setThreshold(Log.DEBUG)
-    pol = policy.Policy()
-    pol.set('matchThreshold', 30)
-    solver = measAst.createSolver(pol, log)
-
-#    solver.setLogLevel(3)
-
-    ids = solver.getIndexIdList()
-    catSet = afwDet.SourceSet()
-    for indexid in ids:
-        X = solver.getCatalogue(ra, dec, radius, '', 'id', indexid)
-        ref = X.refsources
-        inds = X.inds
-        if (len(ref) != 0):
-            cols = solver.getTagAlongColumns(indexid)
-            colnames = [c.name for c in cols]
-
-            tagdata = []
-            for c in cols:
-                fname = 'getTagAlong' + c.ctype
-                func = getattr(solver, fname)
-                data = func(indexid, c.name, inds)
-                tagdata.append(data)
-
-            stars = []
-            for i,r in enumerate(ref):
-                sra = r.getRa()/math.pi*180.
-                sdec = r.getDec()/math.pi*180.
-                if (sra > ra - 0.5 * deltaRa and sra < ra + 0.5 * deltaRa and
-                    sdec > dec - 0.5 * deltaDec and sdec < dec + 0.5 * deltaDec):
-                    star = SDSSstar(sra, sdec)
-                    for c,d in zip(colnames, tagdata):
-                        star.values[c] = d[i]
-                    stars.append(star)
-
-            print len(stars)
-            return stars
+import lsst.pipette.config as pipConfig
+import lsst.afw.geom as afwGeom
 
 def goodStar(s):
     return s.getXAstrom() == s.getXAstrom() and \
            not (s.getFlagForDetection() & measAlg.Flags.SATUR)
 
-def getImageSizeInDegree(srcSet, wcs):
-    """ Get the approximate size of the image in arcseconds
-    
-    Input: 
-    srcSet List of detected objects in the image (with pixel positions)
-    wcs    Wcs converts pixel positions to ra/dec
-    
-    """
-    xfunc = lambda x: x.getXAstrom()
-    yfunc = lambda x: x.getYAstrom()
-
-    x = map(xfunc, [s for s in srcSet if goodStar(s)])
-    y = map(yfunc, [s for s in srcSet if goodStar(s)])
-    
-    minx = min(x)
-    maxx = max(x)
-    miny = min(y)
-    maxy = max(y)
-    
-    llc = wcs.pixelToSky(minx, miny).getPosition()
-    urc = wcs.pixelToSky(maxx, maxy).getPosition()
-    
-    deltaRa  = llc.getX() - urc.getX()
-    deltaDec = urc.getY() - llc.getY()
-    
-    return deltaRa, deltaDec
-
-def run(ioMgr, frameId, ccdId, display=False):
+def run(ioMgr, frameId, ccdId, config, display=False):
 
     data = {'visit': frameId, 'ccd':ccdId}
+
+    raws = ioMgr.readRaw(data)[0]
+    wcsIn = raws.getWcs()
+
     exposure = ioMgr.read('calexp', data, ignore=True)[0]
-    md = ioMgr.read('calexp_md', data, ignore=True)[0]
-    wcsIn = afwImage.makeWcs(md)
+    wcsTrue = exposure.getWcs()
     exposure.setWcs(wcsIn)
 
     if display:
         ds9.mtv(exposure, frame=1)
 
-    butler = ioMgr.inButler
-    srcSet = ioMgr.read('bsc', data, ignore=True)[0].getSources()
+    bscSet = ioMgr.read('bsc', data, ignore=True)[0].getSources()
+    srcSet = [s for s in bscSet if goodStar(s)]
+    print "# of srcSet: ", len(srcSet)
+
+    distConfig = config['distortion']
+    ccd = pipUtil.getCcd(exposure)
+    dist = pipDist.createDistortion(ccd, distConfig)
+
+    distSrc = dist.actualToIdeal(srcSet)
 
     if display:
-        for s in srcSet:
-            ds9.dot("o", s.getXAstrom(), s.getYAstrom(), size=10, frame=1)
+        for (s, d) in zip(srcSet, distSrc):
+            xs = s.getXAstrom()
+            ys = s.getYAstrom()
+            xd = d.getXAstrom()
+            yd = d.getYAstrom()
+            #ds9.dot("o", xs, ys, size=10, frame=1)
+            #ds9.dot("o", xd, yd, size=10, frame=1, ctype=ds9.RED)
+            #ds9.line([[xs,ys], [xd,yd]], frame=1)
+
+    xMin, xMax, yMin, yMax = float("INF"), float("-INF"), float("INF"), float("-INF")
+    for x, y in ((0.0, 0.0), (0.0, exposure.getHeight()), (exposure.getWidth(), 0.0),
+                 (exposure.getWidth(), exposure.getHeight())):
+        point = afwGeom.Point2D(x, y)
+        point = dist.actualToIdeal(point)
+        x, y = point.getX(), point.getY()
+        if x < xMin: xMin = x
+        if x > xMax: xMax = x
+        if y < yMin: yMin = y
+        if y > yMax: yMax = y
+    xMin = int(xMin)
+    yMin = int(yMin)
+    size = (int(xMax - xMin + 0.5),
+            int(yMax - yMin + 0.5))
+    for s in distSrc:
+        s.setXAstrom(s.getXAstrom() - xMin)
+        s.setYAstrom(s.getYAstrom() - yMin)
+
+    sortedDistSrc = sorted(distSrc, key=lambda x:x.getPsfFlux(), reverse=True)
+
+    if display:
+        for i, d in enumerate(sortedDistSrc):
+            #ds9.dot('o', d.getXAstrom(), d.getYAstrom(), size=15, frame=1)
+            if i >= 99: break
+        ds9.line([[0, 0], [0+size[0], 0]], frame=1)
+        ds9.line([[0+size[0], 0], [0+size[0], 0+size[1]]], frame=1)
+        ds9.line([[0+size[0], 0+size[1]], [0, 0+size[1]]], frame=1)
+        ds9.line([[0, 0+size[1]], [0, 0]], frame=1)
 
     log = Log.getDefaultLog()
     pol = policy.Policy()
     pol.set('matchThreshold', 30)
     solver = measAst.createSolver(pol, log)
 
-    (W,H) = (exposure.getWidth(), exposure.getHeight())
-    filterName = 'z'
+    (W,H) = size
+    filterName = 'r'
     idName = 'id'
 
-    catSet = hscAst.queryReferenceCatalog(solver, srcSet, wcsIn, (W,H),
+    wcsIn.shiftReferencePixel(-xMin, -yMin)
+
+    catSet = hscAst.queryReferenceCatalog(solver, distSrc, wcsIn, (W,H),
                                           filterName, idName)
 
+    print "# of catSet: ", len(catSet)
+
     if display:
-        for s in catSet:
-            ds9.dot("o", s.getXAstrom(), s.getYAstrom(), size=10, ctype=ds9.RED, frame=1)
-
-    distConfig = {
-        'radial': { 
-            'coeffs': [-6.61572e-18, 5.69338e-14, 3.03146e-10, 7.16417e-08, 1.0, 0.0],
-            'actualToIdeal': False,
-            'step': 10.0
-            }
-        }
-    ccd = pipUtil.getCcd(exposure)
-    #print ccd.getId(), ccd.getCenter()
-    dist = pipDist.createDistortion(ccd, distConfig)
-
-    distSrc = dist.actualToIdeal(srcSet)
-    #if display:
-    #    for s in distSrc:
-    #        ds9.dot("o", s.getXAstrom(), s.getYAstrom(), size=10, ctype=ds9.RED, frame=1)
+        for c in catSet:
+            ds9.dot("o", c.getXAstrom()+xMin, c.getYAstrom()+yMin, size=15, ctype=ds9.RED, frame=1)
 
     start = datetime.datetime.today()
 
-    matchList = hscMatch.match(distSrc, catSet)
+    matchList = hscAst.match(distSrc, catSet)
 
     end = datetime.datetime.today()
 
+    wcsIn.shiftReferencePixel(xMin, yMin)
+
     matchList2 = []
     for m in matchList:
-        x1, y1 = wcsIn.skyToPixel(m.first.getRa(), m.first.getDec())
         for s in srcSet:
             if (s.getId() == m.second.getId()):
-                x0 = s.getXAstrom()
-                y0 = s.getYAstrom()
+                x0 = m.first.getXAstrom() + xMin
+                y0 = m.first.getYAstrom() + yMin
+                x1 = m.second.getXAstrom()
+                y1 = m.second.getYAstrom()
+                x1 = s.getXAstrom()
+                y1 = s.getYAstrom()
                 #print x0, y0, x1, y1, m.second.getId()
                 if display:
-                    ds9.line([[x0, y0], [x1, y1]], frame=1)
+                    ds9.dot("o", x1, y1, size=10, frame=1)
+                    ds9.line([[x0, y0], [x1, y1]], ctype=ds9.RED, frame=1)
                 m2 = afwDet.SourceMatch(m.first, s, 0.0)
                 matchList2.append(m2)
 
@@ -171,21 +136,23 @@ def run(ioMgr, frameId, ccdId, display=False):
 #    f.close()
 
 if __name__ == '__main__':
-    field = "ACTJ0022M0036"
-    filter = "W-S-ZR"
-    rerun = "yasuda-sup"
+    field = "DITHER3"
+    filter = "W-S-R+"
+    rerun = "yasuda"
+
+    policyfile = os.path.join(os.getenv("PIPETTE_DIR"), "policy", "suprimecam.paf")
+    config = pipConfig.Config(policyfile)
 
     mapper = obsSc.SuprimecamMapper(rerun=rerun)
     ioMgr = pipReadWrite.ReadWrite(mapper, ['visit', 'ccd'], config={})
     frames = ioMgr.inButler.queryMetadata('calexp', None, 'visit', dict(field=field,filter=filter))
     ccds = range(10)
 
-    frames = [126968]
-    ccds = [8]
+    frames = [131658]
+    ccds = [6]
 
     display = True
 
     for frameId in frames:
         for ccdId in ccds:
-            if (frameId != 126963 or ccdId != 2):
-                run(ioMgr, frameId, ccdId, display)
+            run(ioMgr, frameId, ccdId, config, display)
