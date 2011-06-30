@@ -19,35 +19,30 @@ using namespace lsst::afw::detection;
 
 // Compair Source based on its PsfFlux
 // Ordering is bright to faint
-bool cmpSrc(Source::Ptr const *a, Source::Ptr const *b) {
-    return (*a)->getPsfFlux() > (*b)->getPsfFlux();
+bool cmpSrc(Source::Ptr a, Source::Ptr b) {
+    float aFlux = a->getPsfFlux();
+    float bFlux = b->getPsfFlux();
+    if (lsst::utils::isnan(aFlux)) {
+        aFlux = 0.0;
+    }
+    if (lsst::utils::isnan(bFlux)) { 
+        bFlux = 0.0;
+    }
+    return aFlux > bFlux;
 }
 
 bool cmpPair(SourcePair const &a, SourcePair const &b) {
     return a.distance > b.distance;
 }
 
+
 SourceSet hsc::meas::astrom::selectPoint(SourceSet const &a,
 					int num,
 					int start) {
     // copy and sort array of pointers on psfFlux
-    size_t const len = a.size();
-    boost::scoped_array<Source::Ptr const *> pos(new Source::Ptr const *[len]);
-    size_t n = 0;
-    for (SourceSet::const_iterator i(a.begin()), e(a.end()); i != e; ++i, ++n) {
-	pos[n] = &(*i);
-    }
-    std::sort(pos.get(), pos.get() + len, cmpSrc);
-
-    // Construct a new list to store first n objects
-    // starting from start
-    SourceSet b;
-    int imax = start+num < len ? start+num : len;
-    for (int i = start; i < imax; i++) {
-	//std::cout << i << " " << (*pos[i])->getPsfFlux() << std::endl;
-	b.push_back(*pos[i]);
-    }
-
+    SourceSet b(a.begin() + start, a.end());
+    std::sort(b.begin(), b.end(), cmpSrc);
+    b.resize(num);
     return b;
 }
 
