@@ -41,7 +41,7 @@ namespace hsc {
 	  match(lsst::afw::detection::SourceSet const &src,
 		lsst::afw::detection::SourceSet const &cat,
 		int numBrightStars = 100,
-		int minNumMatchedPair = 50,
+		unsigned int minNumMatchedPair = 50,
 		double matchingAllowanceInPixel = 10.,
 		double offsetAllowedInPixel = 300.,
 		bool verbose = false);

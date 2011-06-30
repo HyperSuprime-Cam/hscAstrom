@@ -42,7 +42,7 @@ SourceSet hsc::meas::astrom::selectPoint(SourceSet const &a,
     // Construct a new list to store first n objects
     // starting from start
     SourceSet b;
-    int imax = start+num < len ? start+num : len;
+    unsigned int imax = start+num < len ? start+num : len;
     for (int i = start; i < imax; i++) {
 	//std::cout << i << " " << (*pos[i])->getPsfFlux() << std::endl;
 	b.push_back(*pos[i]);
@@ -325,7 +325,7 @@ std::vector<SourceMatch>
 hsc::meas::astrom::match(SourceSet const &src,
 			 SourceSet const &cat,
 			 int numBrightStars,
-			 int minNumMatchedPair,
+			 unsigned int minNumMatchedPair,
 			 double matchingAllowanceInPixel,
 			 double offsetAllowedInPixel,
 			 bool verbose) {
