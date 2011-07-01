@@ -40,10 +40,10 @@ SourceSet hsc::meas::astrom::selectPoint(SourceSet const &a,
 					int num,
 					int start) {
     // copy and sort array of pointers on psfFlux
-    SourceSet b(a.begin() + start, a.end());
+    SourceSet b(a);
     std::sort(b.begin(), b.end(), cmpSrc);
     b.resize(num);
-    return b;
+    return SourceSet(a.begin() + start, a.end());
 }
 
 std::vector<SourcePair> searchPair(std::vector<SourcePair> &a, SourcePair &p, double e) {
@@ -320,7 +320,7 @@ std::vector<SourceMatch>
 hsc::meas::astrom::match(SourceSet const &src,
 			 SourceSet const &cat,
 			 int numBrightStars,
-			 int minNumMatchedPair,
+			 unsigned int minNumMatchedPair,
 			 double matchingAllowanceInPixel,
 			 double offsetAllowedInPixel,
 			 bool verbose) {
