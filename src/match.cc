@@ -43,7 +43,10 @@ SourceSet hsc::meas::astrom::selectPoint(SourceSet const &a,
     SourceSet b(a);
     std::sort(b.begin(), b.end(), cmpSrc);
     b.resize(num);
-    return SourceSet(a.begin() + start, a.end());
+    if (start == 0) {
+        return b;
+    }
+    return SourceSet(b.begin() + start, b.end());
 }
 
 std::vector<SourcePair> searchPair(std::vector<SourcePair> &a, SourcePair &p, double e) {
@@ -334,7 +337,7 @@ hsc::meas::astrom::match(SourceSet const &src,
     unsigned int catSize = catSub.size();
     /*
     std::ofstream of("zzz");
-    for (int i = 0; i < catSize; i++) {
+    for (int i = 0; i < srcSub.size(); i++) {
 	of << srcSub[i]->getXAstrom() << " " << srcSub[i]->getYAstrom()<< " " << srcSub[i]->getPsfFlux() << " " << catSub[i]->getXAstrom() << " " << catSub[i]->getYAstrom() << " " << catSub[i]->getPsfFlux()<< std::endl;
     }
     of.close();
