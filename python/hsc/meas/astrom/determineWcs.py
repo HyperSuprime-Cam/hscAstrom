@@ -262,7 +262,9 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
         log.log(Log.WARN, "Available filters: " + str(solver.getCatalogueMetadataFields()))
         raise
 
-    measAst.addTagAlongValuesToReferenceSources(solver, policy, log, cat, indexid, inds, filterName)
+    stargalName, variableName, magerrName = measAst.getTagAlongNamesFromPolicy(policy, filterName)
+    measAst.addTagAlongValuesToReferenceSources(solver, stargalName, variableName, magerrName,
+                                                log, cat, indexid, inds, filterName)
     
     if True:
         # Now generate a list of matching objects
@@ -310,26 +312,6 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
     log.log(Log.DEBUG, "Setting exposure's WCS: to\n" + wcs.getFitsMetadata().toString())
     exposure.setWcs(wcs)
 
-    # add current EUPS astrometry_net_data setup.
-    moreMeta = dafBase.PropertyList()
-    andata = os.environ.get('ASTROMETRY_NET_DATA_DIR')
-    if andata is None:
-        moreMeta.add('ANEUPS', 'none', 'ASTROMETRY_NET_DATA_DIR')
-    else:
-        andata = os.path.basename(andata)
-        moreMeta.add('ANEUPS', andata, 'ASTROMETRY_NET_DATA_DIR')
-
-    # cache: field center and size.  These may be off by 1/2 or 1 or 3/2 pixels.
-    # dstn does not care.
-    cx,cy = W/2.,H/2.
-    radec = wcs.pixelToSky(cx, cy)
-    ra,dec = radec.getLongitude(afwCoord.DEGREES), radec.getLatitude(afwCoord.DEGREES)
-    moreMeta.add('RA', ra, 'field center in degrees')
-    moreMeta.add('DEC', dec, 'field center in degrees')
-    moreMeta.add('RADIUS', imgSizeInArcsec/2./3600.,
-            'field radius in degrees, approximate')
-    moreMeta.add('SMATCHV', 1, 'SourceMatchVector version number')
-
     if display:
         for s1, s2, d in matchList:
             # plot the catalogue positions
@@ -337,6 +319,8 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
 
     #matchListMeta = solver.getMatchedIndexMetadata()
     matchListMeta = dafBase.PropertyList()
+    moreMeta = measAst.createMetadata(W, H, wcs, imgSizeInArcsec, filterName,
+                                      stargalName, variableName, magerrName)
     matchListMeta.add('ANINDID', X.indexid, 'Astrometry.net index id')
     moreMeta.combine(matchListMeta)
 
