@@ -42,7 +42,10 @@ SourceSet hsc::meas::astrom::selectPoint(SourceSet const &a,
     // copy and sort array of pointers on psfFlux
     SourceSet b(a);
     std::sort(b.begin(), b.end(), cmpSrc);
-    b.resize(num);
+    if (num < b.size()) {
+        // chop off the end
+        b.resize(num);
+    }
     if (start == 0) {
         return b;
     }
@@ -335,13 +338,12 @@ hsc::meas::astrom::match(SourceSet const &src,
     //std::cout << srcSub.size() << " " << catSub.size() << std::endl;
 
     unsigned int catSize = catSub.size();
-    /*
+    
     std::ofstream of("zzz");
     for (int i = 0; i < srcSub.size(); i++) {
 	of << srcSub[i]->getXAstrom() << " " << srcSub[i]->getYAstrom()<< " " << srcSub[i]->getPsfFlux() << " " << catSub[i]->getXAstrom() << " " << catSub[i]->getYAstrom() << " " << catSub[i]->getPsfFlux()<< std::endl;
     }
     of.close();
-    */
     // Construct a list of Pair of objects in catalog
     std::vector<SourcePair> catPair;
     for (size_t i = 0; i < catSize-1; i++) {
