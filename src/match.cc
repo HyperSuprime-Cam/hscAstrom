@@ -37,8 +37,8 @@ bool cmpPair(SourcePair const &a, SourcePair const &b) {
 
 
 SourceSet hsc::meas::astrom::selectPoint(SourceSet const &a,
-					int num,
-					int start) {
+                                         unsigned int num,
+                                         unsigned int start) {
     // copy and sort array of pointers on psfFlux
     SourceSet b(a);
     std::sort(b.begin(), b.end(), cmpSrc);
@@ -340,7 +340,7 @@ hsc::meas::astrom::match(SourceSet const &src,
     unsigned int catSize = catSub.size();
     
     std::ofstream of("zzz");
-    for (int i = 0; i < srcSub.size(); i++) {
+    for (unsigned int i = 0; i < srcSub.size(); i++) {
 	of << srcSub[i]->getXAstrom() << " " << srcSub[i]->getYAstrom()<< " " << srcSub[i]->getPsfFlux() << " " << catSub[i]->getXAstrom() << " " << catSub[i]->getYAstrom() << " " << catSub[i]->getPsfFlux()<< std::endl;
     }
     of.close();

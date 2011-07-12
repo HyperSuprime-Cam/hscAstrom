@@ -34,8 +34,8 @@ namespace hsc {
 
 	lsst::afw::detection::SourceSet
 	  selectPoint(lsst::afw::detection::SourceSet const &a,
-		      int n,
-		      int start = 0);
+		      unsigned int n,
+		      unsigned int start = 0);
 
 	std::vector<lsst::afw::detection::SourceMatch>
 	  match(lsst::afw::detection::SourceSet const &src,
