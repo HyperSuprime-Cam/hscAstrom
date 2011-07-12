@@ -339,11 +339,13 @@ hsc::meas::astrom::match(SourceSet const &src,
 
     unsigned int catSize = catSub.size();
     
+    /*
     std::ofstream of("zzz");
     for (unsigned int i = 0; i < srcSub.size(); i++) {
 	of << srcSub[i]->getXAstrom() << " " << srcSub[i]->getYAstrom()<< " " << srcSub[i]->getPsfFlux() << " " << catSub[i]->getXAstrom() << " " << catSub[i]->getYAstrom() << " " << catSub[i]->getPsfFlux()<< std::endl;
     }
     of.close();
+    */
     // Construct a list of Pair of objects in catalog
     std::vector<SourcePair> catPair;
     for (size_t i = 0; i < catSize-1; i++) {
