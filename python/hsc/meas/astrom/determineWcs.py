@@ -115,13 +115,14 @@ def queryReferenceCatalog(solver, srcSet, wcsIn, imageSize, filterName,
             dec = r.getDec()
             p = wcsIn.skyToPixel(ra/math.pi*180., dec/math.pi*180.)
             mag = r.getPsfFlux()
-            if (mag == mag):
+            if (mag == mag):    # Not NaN
                 s = afwDet.Source()
                 s.setId(r.getId())
                 s.setXAstrom(p.getX())
                 s.setYAstrom(p.getY())
                 s.setRa(ra)
                 s.setDec(dec)
+                s.setPsfFlux(mag)
                 catSet.append(s)
 
     return catSet
@@ -135,6 +136,8 @@ def runMatch(solver, wcsIn, srcSet, numBrightStars, imageSize, filterName, idNam
     if log is not None: log.log(log.INFO, "Matching to %d good input sources" % len(srcSet2))
 
     minNumMatchedPair = 30
+    if minNumMatchedPair < len(catSet)/5:
+        minNumMatchedPair = len(catSet)/5
     matchList = hscAstrom.match(srcSet2, catSet,
                                 numBrightStars,
                                 minNumMatchedPair)

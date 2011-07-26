@@ -42,14 +42,19 @@ SourceSet hsc::meas::astrom::selectPoint(SourceSet const &a,
     // copy and sort array of pointers on psfFlux
     SourceSet b(a);
     std::sort(b.begin(), b.end(), cmpSrc);
-    if (num < b.size()) {
-        // chop off the end
-        b.resize(num);
-    }
     if (start == 0) {
+	if (num < b.size()) {
+	    // chop off the end
+	    b.resize(num);
+	}
         return b;
+    } else {
+	if (start + num < b.size()) {
+	    return SourceSet(b.begin() + start, b.begin() + start +  num);
+	} else {
+	    return SourceSet(b.begin() + start, b.end());
+	}
     }
-    return SourceSet(b.begin() + start, b.end());
 }
 
 std::vector<SourcePair> searchPair(std::vector<SourcePair> &a, SourcePair &p, double e) {
@@ -302,7 +307,7 @@ std::vector<SourceMatch> FinalVerify(double *coeff,
 	    }
 	    //std::cout << "# of objects matched: " << num << " " << num_prev << std::endl;
 	    if (num == num_prev) break;
-	    if (num > 50) order = 3;
+	    //if (num > 50) order = 3;
 	    coeff = polyfit(order, srcMat, catMat);
 	    num_prev = num;
 	}
@@ -338,6 +343,7 @@ hsc::meas::astrom::match(SourceSet const &src,
     //std::cout << srcSub.size() << " " << catSub.size() << std::endl;
 
     unsigned int catSize = catSub.size();
+    unsigned int srcSize = srcSub.size();
     
     /*
     std::ofstream of("zzz");
@@ -357,13 +363,24 @@ hsc::meas::astrom::match(SourceSet const &src,
     // Sort catPair on distance
     std::sort(catPair.begin(), catPair.end(), cmpPair);
 
+    // Construct a list of Pair of objects in source
+    std::vector<SourcePair> srcPair;
+    for (size_t i = 0; i < srcSize-1; i++) {
+	for (size_t j = i+1; j < srcSize; j++) {
+	    srcPair.push_back(SourcePair(srcSub[i], srcSub[j]));
+	}
+    }
+
+    // Sort srcPair on distance
+    std::sort(srcPair.begin(), srcPair.end(), cmpPair);
+
     std::vector<SourceMatch> matPair;
 
     size_t m = 5;		// Number of objects to define the shape
     double e = matchingAllowanceInPixel; // Error allowed for matching
-    for (size_t i = 0; i < srcSub.size()-1; i++) {
-	for (size_t j = i+1; j < srcSub.size(); j++) {
-	    SourcePair p(srcSub[i], srcSub[j]);
+    for (size_t ii = 0; ii < srcPair.size(); ii++) {
+	SourcePair p = srcPair[ii];
+
 	    std::vector<SourcePair> q = searchPair(catPair, p, e);
 
 	    // If candidate pairs are found
@@ -386,9 +403,10 @@ hsc::meas::astrom::match(SourceSet const &src,
 		    //std::cout << "p dist: " << p.distance << " pa: " << p.pa << std::endl;
 		    //std::cout << "q dist: " << q[l].distance << " pa: " << q[l].pa << std::endl;
 
-		    for (size_t k = j+1; k < srcSub.size(); k++) {
+		    for (size_t k = 0; k < srcSub.size(); k++) {
+			if (p.first == srcSub[k] || p.second == srcSub[k]) continue;
 
-			SourcePair pp(srcSub[i], srcSub[k]);
+			SourcePair pp(p.first, srcSub[k]);
 
 			std::vector<SourcePair>::iterator r = searchPair3(catPair, pp, q[l], e, dpa);
 			if (r != catPair.end()) {
@@ -469,8 +487,7 @@ hsc::meas::astrom::match(SourceSet const &src,
 		} // for l
 		//std::cout << std::endl;
 	    }	// if
-	}	// for j
-    }	// for i
+    }	// for ii
 
  FIN:
 
