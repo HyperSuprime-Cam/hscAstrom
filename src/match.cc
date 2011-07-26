@@ -48,13 +48,11 @@ SourceSet hsc::meas::astrom::selectPoint(SourceSet const &a,
 	    b.resize(num);
 	}
         return b;
-    } else {
-	if (start + num < b.size()) {
-	    return SourceSet(b.begin() + start, b.begin() + start +  num);
-	} else {
-	    return SourceSet(b.begin() + start, b.end());
-	}
     }
+    if (start + num < b.size()) {
+        return SourceSet(b.begin() + start, b.begin() + start +  num);
+    }
+    return SourceSet(b.begin() + start, b.end());
 }
 
 std::vector<SourcePair> searchPair(std::vector<SourcePair> &a, SourcePair &p, double e) {
