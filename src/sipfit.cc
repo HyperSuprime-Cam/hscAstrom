@@ -129,7 +129,7 @@ hsc::meas::astrom::fitTANSIP(int order,
     double ra, dec;
 
     lsst::afw::geom::PointD crpix = crpixo;
-    lsst::afw::geom::PointD crval = crvalo->getPosition(lsst::afw::coord::RADIANS);
+    lsst::afw::geom::PointD crval = crvalo->getPosition(lsst::afw::geom::radians);
 
     int ncoeff = (order+1)*(order+2)/2 - 1;
     double *coeff = NULL;
