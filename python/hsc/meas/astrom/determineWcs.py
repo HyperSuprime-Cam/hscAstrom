@@ -24,112 +24,8 @@ def goodStar(s):
     return s.getXAstrom() == s.getXAstrom() and \
            not (s.getFlagForDetection() & measAlg.Flags.SATUR)
 
-def getImageSizeInDegree(srcSet, wcs):
-    """ Get the approximate size of the image in arcseconds
-    
-    Input: 
-    srcSet List of detected objects in the image (with pixel positions)
-    wcs    Wcs converts pixel positions to ra/dec
-    
-    """
-    xfunc = lambda x: x.getXAstrom()
-    yfunc = lambda x: x.getYAstrom()
-    
-    x = map(xfunc, [s for s in srcSet if goodStar(s)])
-    y = map(yfunc, [s for s in srcSet if goodStar(s)])
-
-    minx = min(x)
-    maxx = max(x)
-    miny = min(y)
-    maxy = max(y)
-    
-    llc = wcs.pixelToSky(minx, miny).getPosition()
-    urc = wcs.pixelToSky(maxx, maxy).getPosition()
-    
-    deltaRa  = math.fabs(llc.getX() - urc.getX())
-    deltaDec = math.fabs(urc.getY() - llc.getY())
-    
-    return deltaRa, deltaDec
-
-def getCatalogueForField(solver, srcSet, wcsIn, imageSize, filterName, idName, margin):
-    W, H = imageSize
-    skyCenter = wcsIn.pixelToSky(W/2, H/2).getPosition()
-    ra = skyCenter.getX()
-    dec = skyCenter.getY()
-
-    #deltaRa, deltaDec = getImageSizeInDegree(srcSet, wcsIn)
-
-    #radius = max(deltaRa, deltaDec) * 3600.
-
-    radius = max(W, H) * wcsIn.pixelScale()
-
-    ids = solver.getIndexIdList()
-    indexid_new = []
-    ref_new = []
-    idx_new = []
-    for indexid in ids:
-        if indexid % 10 != 0:
-            continue;
-        X = solver.getCatalogue(ra, dec, radius, '', idName, indexid)
-        if len(X.refsources) != 0:
-            indexid_new.append(indexid)
-            cols = solver.getTagAlongColumns(indexid)
-            colnames = [c.name for c in cols]
-
-            tagdata = []
-            for c in cols:
-                fname = 'getTagAlong' + c.ctype
-                func = getattr(solver, fname)
-                data = func(indexid, c.name, X.inds)
-                tagdata.append(data)
-
-            i_filter = colnames.index(filterName)
-
-            for i, (ref, idx) in enumerate(zip(X.refsources, X.inds)):
-                ra = ref.getRa()/math.pi*180.
-                dec = ref.getDec()/math.pi*180.
-                pix = wcsIn.skyToPixel(ra, dec)
-                if (-margin < pix[0] < W+margin and \
-                    -margin < pix[1] < H+margin):
-                    mag = tagdata[i_filter][i]
-                    ref.setPsfFlux(math.pow(10.0, -0.4*mag))
-                    ref_new.append(ref)
-                    idx_new.append(idx)
-
-    if len(indexid_new) == 0:
-        raise RuntimeError("Reference catalogue is empty (%f,%f,%f)" % (ra, dec, radius))
-
-    X.indexid = indexid_new[0]
-    X.refsources = ref_new
-    X.inds = idx_new
-    return X
-
-def queryReferenceCatalog(solver, srcSet, wcsIn, imageSize, filterName,
-                          idName, margin=50):
-    X = getCatalogueForField(solver, srcSet, wcsIn, imageSize, filterName, idName, margin)
-    ref = X.refsources
-    catSet = afwDet.SourceSet()
-    if (len(ref) != 0):
-        for i,r in enumerate(ref):
-            ra = r.getRa()
-            dec = r.getDec()
-            p = wcsIn.skyToPixel(ra/math.pi*180., dec/math.pi*180.)
-            mag = r.getPsfFlux()
-            if (mag == mag):    # Not NaN
-                s = afwDet.Source()
-                s.setId(r.getId())
-                s.setXAstrom(p.getX())
-                s.setYAstrom(p.getY())
-                s.setRa(ra)
-                s.setDec(dec)
-                s.setPsfFlux(mag)
-                catSet.append(s)
-
-    return catSet
-
-def runMatch(solver, wcsIn, srcSet, numBrightStars, imageSize, filterName, idName, log=None):
-    
-    catSet = queryReferenceCatalog(solver, srcSet, wcsIn, imageSize, filterName, idName)
+def runMatch(solver, wcsIn, srcSet, numBrightStars, meta, policy, filterName, log=None):
+    catSet = measAst.readReferenceSourcesFromMetadata(meta, log=log, policy=policy, filterName=filterName)
     if log is not None: log.log(log.INFO, "Retrieved %d reference catalog sources" % len(catSet))
 
     srcSet2 = [s for s in srcSet if goodStar(s)]
@@ -191,13 +87,11 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
         for s in sourceSet:
             ds9.dot("o", s.getXAstrom(), s.getYAstrom(), size=3, ctype=ds9.RED, frame=frame)
 
-    #Extract an initial guess WCS if available    
-    wcsIn = exposure.getWcs() #May be None
-    # Exposure uses the special object "NoWcs" instead of NULL.  Because they're special.
-    haswcs = exposure.hasWcs()
-    if not haswcs:
-        log.log(log.WARN, "No WCS found in exposure. Doing blind solve")
-
+    if not exposure.hasWcs():
+        log.log(log.WARN, "No WCS found in exposure; hsc.meas.astrom fails")
+        raise RuntimeError("No WCS found in expousre")
+    wcsIn = exposure.getWcs()
+    
     # Setup solver
     if solver is None:
         solver = measAst.createSolver(policy, log)
@@ -216,82 +110,21 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
     solver.setImageSize(W, H)
     #solver.printSolverSettings(stdout)
 
-    key = 'pixelScaleUncertainty'
-    if policy.exists(key):
-        dscale = float(policy.get(key))
-    else:
-        dscale = None
+    filterName = measAst.chooseFilterName(exposure, policy, solver, log, filterName)
+    stargalName, variableName, magerrName = measAst.getTagAlongNamesFromPolicy(policy, filterName)
+    meta = measAst.createMetadata(W, H, wcsIn, filterName, stargalName, variableName, magerrName)
 
-    # Do a blind solve if we're told to, or if we don't have an input WCS
-    doBlindSolve = policy.get('blindSolve') or (not haswcs)
-    if doBlindSolve:
-        log.log(log.DEBUG, "Solving with no initial guess at position")
-        isSolved = solver.solve()
-    elif dscale is not None:
-        isSolved = solver.solve(wcsIn, dscale)
-    else:
-#        isSolved = solver.solve(wcsIn)
-        isSolved, wcs, matchList = runMatch(solver, wcsIn, sourceSet,
-                            min(policy.get('numBrightStars'), len(sourceSet)),
-                            (W,H), filterName, measAst.getIdColumn(policy), log=log)
-        if isSolved:
-            log.log(log.INFO, "Found %d matches in hscAstrom" % (0 if matchList is None else len(matchList)))
+    isSolved, wcs, matchList = runMatch(solver, wcsIn, sourceSet,
+                                        min(policy.get('numBrightStars'), len(sourceSet)),
+                                        meta, policy, filterName, log=log)
+    if isSolved:
+        log.log(log.INFO, "Found %d matches in hscAstrom" % (0 if matchList is None else len(matchList)))
 
     # Did we solve?
     log.log(log.DEBUG, 'Finished astrometric solution')
     if not isSolved:
         log.log(log.WARN, "No astrometric solution found")
         return None
-#    wcs = solver.getWcs()
-
-    # Generate a list of catalogue objects in the field.
-    imgSizeInArcsec = wcs.pixelScale() * math.hypot(W,H)
-    filterName = measAst.chooseFilterName(exposure, policy, solver, log, filterName)
-    idName = measAst.getIdColumn(policy)
-    try:
-        margin = 50 # pixels
-        #X = solver.getCatalogueForSolvedField(filterName, idName, margin)
-        X = getCatalogueForField(solver, sourceSet, wcs, (W,H), filterName, idName, margin)
-        cat = X.refsources
-        indexid = X.indexid
-        inds = X.inds
-    except LsstCppException, e:
-        log.log(Log.WARN, str(e))
-        log.log(Log.WARN, "Attempting to access catalogue positions and fluxes")
-        version = os.environ['ASTROMETRY_NET_DATA_DIR']
-        log.log(Log.WARN, "Catalogue version: %s" %(version))
-        log.log(Log.WARN, "ID column: %s" %(idName))
-        log.log(Log.WARN, "Requested filter: %s" %(filterName))
-        log.log(Log.WARN, "Available filters: " + str(solver.getCatalogueMetadataFields()))
-        raise
-
-    stargalName, variableName, magerrName = measAst.getTagAlongNamesFromPolicy(policy, filterName)
-    measAst.addTagAlongValuesToReferenceSources(solver, stargalName, variableName, magerrName,
-                                                log, cat, indexid, inds, filterName)
-    
-    if True:
-        # Now generate a list of matching objects
-        distInArcsec = policy.get('distanceForCatalogueMatchinArcsec')
-        cleanParam = policy.get('cleaningParameter')
-
-        matchList = measAst.matchSrcAndCatalogue(cat=cat, img=sourceSet, wcs=wcs,
-            distInArcsec=distInArcsec, cleanParam=cleanParam)
-
-        uniq = set([sm.second.getId() for sm in matchList])
-        if len(matchList) != len(uniq):
-            log.log(Log.WARN, "The list of matches stars contains duplicated reference sources (%i sources, %i unique ids)"
-                    % (len(matchList), len(uniq)))
-
-        if len(matchList) == 0:
-            log.log(Log.WARN, "No matches found between input source and catalogue.")
-            log.log(Log.WARN, "Something is wrong. Defaulting to input WCS")
-            return astrom
-
-        log.log(Log.DEBUG, "%i catalogue objects match input source list using linear WCS" %(len(matchList)))
-    else:
-        # Use list of matches returned by Astrometry.net
-        log.log(Log.DEBUG, "Getting matched sources: Fluxes in column %s; Ids in column" % (filterName, idName))
-        matchList = solver.getMatchedSources(filterName, idName)
 
     astrom.tanWcs = wcs
     astrom.tanMatches = matchList
@@ -305,7 +138,8 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
 
     if policy.get('calculateSip'):
         sipOrder = policy.get('sipOrder')
-        wcs, matchList = measAst.calculateSipTerms(wcs, cat, sourceSet, distInArcsec, cleanParam, sipOrder, log)
+        wcs, matchList = measAst.calculateSipTerms(wcs, cat, sourceSet, distInArcsec, 
+                                                   cleanParam, sipOrder, log)
 
         astrom.sipWcs = wcs
         astrom.sipMatches = matchList
@@ -320,14 +154,7 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
             # plot the catalogue positions
             ds9.dot("+", s1.getXAstrom(), s1.getYAstrom(), size=3, ctype=ds9.BLUE, frame=frame)
 
-    #matchListMeta = solver.getMatchedIndexMetadata()
-    matchListMeta = dafBase.PropertyList()
-    moreMeta = measAst.createMetadata(W, H, wcs, imgSizeInArcsec, filterName,
-                                      stargalName, variableName, magerrName)
-    matchListMeta.add('ANINDID', X.indexid, 'Astrometry.net index id')
-    moreMeta.combine(matchListMeta)
-
-    astrom.matchMetadata = moreMeta
+    astrom.matchMetadata = meta
     astrom.wcs = wcs
     astrom.matches = matchList
 
