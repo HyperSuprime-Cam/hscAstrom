@@ -6,6 +6,7 @@ import lsst.meas.astrom        as measAst
 import lsst.meas.algorithms    as measAlg
 import lsst.afw.detection      as afwDet
 import lsst.daf.base           as dafBase
+import lsst.afw.geom           as afwGeom
 import lsst.afw.coord          as afwCoord
 import lsst.afw.display.ds9    as ds9
 import astromLib as hscAstrom
@@ -24,10 +25,7 @@ def goodStar(s):
     return s.getXAstrom() == s.getXAstrom() and \
            not (s.getFlagForDetection() & measAlg.Flags.SATUR)
 
-def runMatch(solver, wcsIn, srcSet, numBrightStars, meta, policy, filterName, log=None):
-    catSet = measAst.readReferenceSourcesFromMetadata(meta, log=log, policy=policy, filterName=filterName)
-    if log is not None: log.log(log.INFO, "Retrieved %d reference catalog sources" % len(catSet))
-
+def runMatch(srcSet, catSet, numBrightStars, log=None):
     srcSet2 = [s for s in srcSet if goodStar(s)]
     if log is not None: log.log(log.INFO, "Matching to %d good input sources" % len(srcSet2))
 
@@ -45,6 +43,16 @@ def runMatch(solver, wcsIn, srcSet, numBrightStars, meta, policy, filterName, lo
         return True, wcsOut, matchList
     else:
         return False, None, None
+
+def readReferenceSources(meta, wcsIn, policy, filterName, log=None):
+    catSet = measAst.readReferenceSourcesFromMetadata(meta, log=log, policy=policy, filterName=filterName)
+    if log is not None: log.log(log.INFO, "Retrieved %d reference catalog sources" % len(catSet))
+    
+    for i,src in enumerate(catSet):
+        p = wcsIn.skyToPixel(src.getRaDec())
+        src.setXAstrom(p.getX())
+        src.setYAstrom(p.getY())
+    return catSet
 
 def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=False,
                  forceImageSize=None, filterName=None):
@@ -113,10 +121,10 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
     filterName = measAst.chooseFilterName(exposure, policy, solver, log, filterName)
     stargalName, variableName, magerrName = measAst.getTagAlongNamesFromPolicy(policy, filterName)
     meta = measAst.createMetadata(W, H, wcsIn, filterName, stargalName, variableName, magerrName)
+    catSet = readReferenceSources(meta, wcsIn, policy, filterName, log=log)
 
-    isSolved, wcs, matchList = runMatch(solver, wcsIn, sourceSet,
-                                        min(policy.get('numBrightStars'), len(sourceSet)),
-                                        meta, policy, filterName, log=log)
+    isSolved, wcs, matchList = runMatch(sourceSet, catSet, min(policy.get('numBrightStars'), len(sourceSet)),
+                                        log=log)
     if isSolved:
         log.log(log.INFO, "Found %d matches in hscAstrom" % (0 if matchList is None else len(matchList)))
 
@@ -137,8 +145,10 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
         assert(m.second in sourceSet)
 
     if policy.get('calculateSip'):
+        distInArcsec = policy.get('distanceForCatalogueMatchinArcsec') * afwGeom.arcseconds
+        cleanParam = policy.get('cleaningParameter')
         sipOrder = policy.get('sipOrder')
-        wcs, matchList = measAst.calculateSipTerms(wcs, cat, sourceSet, distInArcsec, 
+        wcs, matchList = measAst.calculateSipTerms(wcs, catSet, sourceSet, distInArcsec, 
                                                    cleanParam, sipOrder, log)
 
         astrom.sipWcs = wcs
