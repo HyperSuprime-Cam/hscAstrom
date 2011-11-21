@@ -1,4 +1,3 @@
-setupOptional(gcc)
 setupRequired(python)
 
 setupRequired(boost)
