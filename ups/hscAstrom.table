@@ -1,4 +1,5 @@
 setupRequired(python)
+setupRequired(scons)
 
 setupRequired(boost)
 setupRequired(gsl)
