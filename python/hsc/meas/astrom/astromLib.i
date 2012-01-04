@@ -9,7 +9,11 @@ Python interface to hsc::meas::match
 %module(package="hsc.meas.astrom", docstring=astromLib_DOCSTRING) astromLib
 
 %{
+#include "lsst/pex/logging.h"
 #include "lsst/afw/image.h"
+#include "lsst/afw/cameraGeom.h"
+#include "lsst/afw/detection.h"
+#include "lsst/afw/detection/AperturePhotometry.h"
 %}
 
 %include "lsst/p_lsstSwig.i"
