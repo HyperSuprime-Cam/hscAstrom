@@ -22,8 +22,7 @@ except ImportError, e:
         display = False
 
 def goodStar(s):
-    return s.getXAstrom() == s.getXAstrom() and \
-           not (s.getFlagForDetection() & measAlg.Flags.SATUR)
+    return s.getXAstrom() == s.getXAstrom() and not (s.getFlagForDetection() & measAlg.Flags.SATUR)
 
 def runMatch(srcSet, catSet, numBrightStars, log=None):
     srcSet2 = [s for s in srcSet if goodStar(s)]
@@ -35,11 +34,9 @@ def runMatch(srcSet, catSet, numBrightStars, log=None):
     matchList = hscAstrom.match(srcSet2, catSet,
                                 numBrightStars,
                                 minNumMatchedPair)
-
-    if len(matchList) != 0:
+    
+    if len(matchList) > 1:
         wcsOut = hscAstrom.fitTAN(matchList)
-
-    if len(matchList) != 0:
         return True, wcsOut, matchList
     else:
         return False, None, None
@@ -129,13 +126,14 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
         log.log(log.INFO, "Found %d matches in hscAstrom" % (0 if matchList is None else len(matchList)))
 
     # Did we solve?
-    log.log(log.DEBUG, 'Finished astrometric solution')
+    log.log(log.INFO, 'Finished astrometric solution')
     if not isSolved:
         log.log(log.WARN, "No astrometric solution found")
         return None
 
     astrom.tanWcs = wcs
     astrom.tanMatches = matchList
+    print len(matchList)
 
     srcids = [s.getSourceId() for s in sourceSet]
     #print 'srcids:', srcids
