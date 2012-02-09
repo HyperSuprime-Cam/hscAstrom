@@ -119,6 +119,8 @@ def determineWcs(policy, exposure, sourceSet, log=None, solver=None, doTrim=Fals
     stargalName, variableName, magerrName = measAst.getTagAlongNamesFromPolicy(policy, filterName)
     meta = measAst.createMetadata(W, H, wcsIn, filterName, stargalName, variableName, magerrName)
     catSet = readReferenceSources(meta, wcsIn, policy, filterName, log=log)
+    measAst._addTagAlongValuesToReferenceSources(solver, stargalName, variableName, magerrName,
+                                                 log, refcat, filterName)
 
     isSolved, wcs, matchList = runMatch(sourceSet, catSet, min(policy.get('numBrightStars'), len(sourceSet)),
                                         log=log)
