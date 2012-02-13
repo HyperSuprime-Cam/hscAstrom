@@ -6,6 +6,12 @@ import lsst.meas.astrom.astrom as measAst
 import hsc.meas.astrom.astromLib as hscAstrom
 from lsst.pex.config import Config, Field, RangeField
 
+try:
+    type(debugging)
+except:
+    debugging = False
+    
+
 class TaburAstrometryConfig(measAst.MeasAstromConfig):
     numBrightStars = RangeField(
         doc="Number of bright stars to use",
@@ -23,10 +29,10 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
         doc="Padding to add to image size (pixels)",
         dtype=int,
         default=50, min=0)
-    raDecSearchRadius = RangeField(
-        '''When useWcsRaDecCenter=True, this is the radius, in degrees, around the RA,Dec center specified in the input exposure\'s WCS to search for a solution.''',
-        float,
-        default=1., min=0.)
+    matchingRadius = RangeField(
+        doc="Radius within which to consider matches (pixels)",
+        dtype=float,
+        default=100.0, min=0.0)
     calculateSip = Field(
         doc='''Compute polynomial SIP distortion terms?''',
         dtype=bool,
@@ -68,7 +74,20 @@ class TaburAstrometry(measAst.Astrometry):
         minNumMatchedPair = min(self.config.minMatchedPairNumber,
                                 int(self.config.minMatchedPairFrac * len(cat)))
 
-        matchList = hscAstrom.match(sources, cat, self.config.numBrightStars, minNumMatchedPair)
+        if debugging:
+            import lsst.afw.display.ds9 as ds9
+            frame = 1
+            ds9.mtv(exposure, frame=frame)
+            for s in sources:
+                ds9.dot("o", s.getXAstrom(), s.getYAstrom(), frame=frame, ctype=ds9.GREEN)
+            for s in cat:
+                pix = wcs.skyToPixel(s.getRaDec())
+                ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.RED)
+            import pdb;pdb.set_trace()
+
+
+        matchList = hscAstrom.match(sources, cat, self.config.numBrightStars, minNumMatchedPair,
+                                    self.config.matchingRadius)
         if matchList is None or len(matchList) == 0:
             raise RuntimeError("Unable to match sources")
         if self.log: self.log.log(self.log.INFO, "Matched %d sources" % len(matchList))
