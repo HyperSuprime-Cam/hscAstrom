@@ -1,16 +1,11 @@
 #!/usr/bin/env python
 
 import lsst.daf.base as dafBase
+import lsst.afw.detection as afwDet
 import lsst.meas.algorithms as measAlg
 import lsst.meas.astrom.astrom as measAst
 import hsc.meas.astrom.astromLib as hscAstrom
 from lsst.pex.config import Config, Field, RangeField
-
-try:
-    type(debugging)
-except:
-    debugging = False
-    
 
 class TaburAstrometryConfig(measAst.MeasAstromConfig):
     numBrightStars = RangeField(
@@ -51,14 +46,29 @@ def goodStar(s):
     return s.getXAstrom() == s.getXAstrom() and not (s.getFlagForDetection() & measAlg.Flags.SATUR)
 
 
+def show(exposure, wcs, sources, catalog, matches=[], frame=1):
+    import lsst.afw.display.ds9 as ds9
+    ds9.mtv(exposure, frame=frame)
+    for s in sources:
+        ds9.dot("o", s.getXAstrom(), s.getYAstrom(), frame=frame, ctype=ds9.GREEN)
+    for s in catalog:
+        pix = wcs.skyToPixel(s.getRaDec())
+        ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.RED)
+    for m in matches:
+        pix = wcs.skyToPixel(m.first.getRaDec())
+        ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.YELLOW)
+        ds9.dot("+", m.second.getXAstrom(), m.second.getYAstrom(), frame=frame, ctype=ds9.YELLOW)
+
 class TaburAstrometry(measAst.Astrometry):
     """Star matching using algorithm based on V.Tabur 2007, PASA, 24, 189-198
     ("Fast Algorithms for Matching CCD Images to a Stellar Catalogue")
     """
     ConfigClass = TaburAstrometryConfig
 
-    
     def determineWcs(self, sources, exposure):
+        import lsstDebug
+        debugging = lsstDebug.Info(__name__).display
+        
         wcs = exposure.getWcs() # Guess WCS
         if wcs is None:
             raise RuntimeError("This matching algorithm requires an input guess WCS")
@@ -74,17 +84,7 @@ class TaburAstrometry(measAst.Astrometry):
         minNumMatchedPair = min(self.config.minMatchedPairNumber,
                                 int(self.config.minMatchedPairFrac * len(cat)))
 
-        if debugging:
-            import lsst.afw.display.ds9 as ds9
-            frame = 1
-            ds9.mtv(exposure, frame=frame)
-            for s in sources:
-                ds9.dot("o", s.getXAstrom(), s.getYAstrom(), frame=frame, ctype=ds9.GREEN)
-            for s in cat:
-                pix = wcs.skyToPixel(s.getRaDec())
-                ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.RED)
-            import pdb;pdb.set_trace()
-
+        if debugging: show(exposure, wcs, sources, cat, frame=1)
 
         matchList = hscAstrom.match(sources, cat, self.config.numBrightStars, minNumMatchedPair,
                                     self.config.matchingRadius)
@@ -92,6 +92,8 @@ class TaburAstrometry(measAst.Astrometry):
             raise RuntimeError("Unable to match sources")
         if self.log: self.log.log(self.log.INFO, "Matched %d sources" % len(matchList))
         wcs = hscAstrom.fitTAN(matchList)
+
+        if debugging: show(exposure, wcs, sources, cat, matches=matchList, frame=2)
 
         astrom = measAst.InitialAstrometry()
         astrom.tanMatches = matchList
@@ -104,7 +106,14 @@ class TaburAstrometry(measAst.Astrometry):
             astrom.sipMatches = matchList
 
         exposure.setWcs(wcs)
+
         astrom.matchMetadata = measAst._createMetadata(imageSize[0], imageSize[1], wcs, filterName)
+        astrom.wcs = wcs
+        astrom.matches = afwDet.SourceMatchVector()
+        for m in matchList:
+            astrom.matches.push_back(m)
+
+        if debugging: show(exposure, wcs, sources, cat, matches=matchList, frame=3)
 
         return astrom
 
