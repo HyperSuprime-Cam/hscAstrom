@@ -2,24 +2,24 @@
 
 import lsst.daf.base as dafBase
 import lsst.meas.astrom.astrom as measAst
-import lsst.pex.config as pexConfig
+from lsst.pex.config import Config, Field, RangeField
 
-class TaburAstrometryConfig(pexConfig.Config):
-    numBrightStars = Field(
+class TaburAstrometryConfig(Config):
+    numBrightStars = RangeField(
         doc="Number of bright stars to use",
         dtype=int,
         default=50, min=2)
-    minMatchedPairNumber = Field(
+    minMatchedPairNumber = RangeField(
         doc="Minimum number of matched pairs",
         dtype=int,
         default=30, min=2)
-    minMatchedPairFrac = Field(
+    minMatchedPairFrac = RangeField(
         doc="Minimum number of matched pairs, expressed as a fraction of the reference catalogue size",
         dtype=float,
         default=0.2, min=0, max=1)
-    pixelMargin = Field(
-        doc="Padding to add to image size (pixels)"
-        dtype=int
+    pixelMargin = RangeField(
+        doc="Padding to add to image size (pixels)",
+        dtype=int,
         default=50, min=0)
     calculateSip = Field(
         doc='''Compute polynomial SIP distortion terms?''',
