@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
 import lsst.daf.base as dafBase
+import lsst.meas.algorithms as measAlg
 import lsst.meas.astrom.astrom as measAst
+import hsc.meas.astrom.astromLib as hscAstrom
 from lsst.pex.config import Config, Field, RangeField
 
-class TaburAstrometryConfig(Config):
+class TaburAstrometryConfig(measAst.MeasAstromConfig):
     numBrightStars = RangeField(
         doc="Number of bright stars to use",
         dtype=int,
@@ -21,6 +23,10 @@ class TaburAstrometryConfig(Config):
         doc="Padding to add to image size (pixels)",
         dtype=int,
         default=50, min=0)
+    raDecSearchRadius = RangeField(
+        '''When useWcsRaDecCenter=True, this is the radius, in degrees, around the RA,Dec center specified in the input exposure\'s WCS to search for a solution.''',
+        float,
+        default=1., min=0.)
     calculateSip = Field(
         doc='''Compute polynomial SIP distortion terms?''',
         dtype=bool,
@@ -29,6 +35,10 @@ class TaburAstrometryConfig(Config):
         doc='''Polynomial order of SIP distortion terms''',
         dtype=int,
         default=4, min=2)
+    # Set these for proper operation of overridden astrometry class
+    useWcsPixelScale = True
+    useWcsRaDecCenter = True
+    useWcsParity = True
 
 
 def goodStar(s):
@@ -51,15 +61,16 @@ class TaburAstrometry(measAst.Astrometry):
         cat = self.getReferenceSourcesForWcs(wcs, imageSize, filterName, self.config.pixelMargin)
         if self.log: self.log.log(self.log.INFO, "Found %d catalog sources" % len(cat))
 
-        sources = [s for s in sources if self._goodStar(s)]
+        sources = [s for s in sources if goodStar(s)]
         if self.log: self.log.log(self.log.INFO, "Matching to %d good input sources" % len(sources))
 
+        numBrightStars = max(self.config.numBrightStars, len(sources))
         minNumMatchedPair = min(self.config.minMatchedPairNumber,
                                 int(self.config.minMatchedPairFrac * len(cat)))
 
         matchList = hscAstrom.match(sources, cat, self.config.numBrightStars, minNumMatchedPair)
         if matchList is None or len(matchList) == 0:
-            raise RuntimeErorr("Unable to match sources")
+            raise RuntimeError("Unable to match sources")
         if self.log: self.log.log(self.log.INFO, "Matched %d sources" % len(matchList))
         wcs = hscAstrom.fitTAN(matchList)
 
