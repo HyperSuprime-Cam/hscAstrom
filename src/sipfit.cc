@@ -8,6 +8,7 @@
 
 using namespace hsc::meas::astrom;
 using namespace lsst::afw::detection;
+namespace afwGeom = lsst::afw::geom;
 
 #include <gsl/gsl_linalg.h>
 
@@ -161,8 +162,8 @@ hsc::meas::astrom::fitTANSIP(int order,
     int iexp = 0; int nexp = 1;
     double w1 = 1.0;
     for (int i = 0; i < npair; i++) {
-	ra = matPair[i].first->getRa();
-	dec = matPair[i].first->getDec();
+	ra = matPair[i].first->getRaDec()->getLongitude().asRadians();
+	dec = matPair[i].first->getRaDec()->getLatitude().asRadians();
 	double xi    = calXi  (ra, dec, crval[0], crval[1]);
 	double xi_A  = calXi_A(ra, dec, crval[0], crval[1]);
 	double xi_D  = calXi_D(ra, dec, crval[0], crval[1]);
@@ -251,8 +252,8 @@ hsc::meas::astrom::fitTANSIP(int order,
 
     cat.clear();
     for (int i = 0; i < npair; i++) {
-	ra  = matPair[i].first->getRa() * D2R;
-	dec = matPair[i].first->getDec() * D2R;
+	ra  = matPair[i].first->getRaDec()->getLongitude().asRadians();
+	dec = matPair[i].first->getRaDec()->getLatitude().asRadians();
 	x[i] = calXi(ra, dec, crval[0], crval[1]);
 	y[i] = calEta(ra, dec, crval[0], crval[1]);
 	double D = cd(0,0) * cd(1,1) - cd(0,1) * cd(1,0);
@@ -325,11 +326,12 @@ hsc::meas::astrom::fitTAN(std::vector<SourceMatch> const &matPair,
     double Sx = 0.0;
     double Sy = 0.0;
     for (int i = 0; i < npair; i++) {
-	Sra  += matPair[i].first->getRa();
-	Sdec += matPair[i].first->getDec();
+	Sra  += matPair[i].first->getRaDec()->getLongitude().asRadians();
+	Sdec += matPair[i].first->getRaDec()->getLatitude().asRadians();
 	Sx += matPair[i].second->getXAstrom();
 	Sy += matPair[i].second->getYAstrom();
     }
+    // XXX This may be problematic if we span the RA=0 line or a pole
     lsst::afw::geom::PointD crval = lsst::afw::geom::Point2D(Sra/npair, Sdec/npair);
     lsst::afw::geom::PointD crpix = lsst::afw::geom::Point2D(Sx/npair, Sy/npair);
 
@@ -363,8 +365,8 @@ hsc::meas::astrom::fitTAN(std::vector<SourceMatch> const &matPair,
     int iexp = 0; int nexp = 1;
     double w1 = 1.0;
     for (int i = 0; i < npair; i++) {
-	double ra = matPair[i].first->getRa();
-	double dec = matPair[i].first->getDec();
+	double ra = matPair[i].first->getRaDec()->getLongitude().asRadians();
+	double dec = matPair[i].first->getRaDec()->getLatitude().asRadians();
 	double xi    = calXi  (ra, dec, crval[0], crval[1]);
 	double xi_A  = calXi_A(ra, dec, crval[0], crval[1]);
 	double xi_D  = calXi_D(ra, dec, crval[0], crval[1]);
