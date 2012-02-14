@@ -104,7 +104,7 @@ class TaburAstrometry(measAst.Astrometry):
 
 
         print wcs.pixelScale()
-        wcs = hscAstrom.fitTAN(matchList, True)# if debugging else False)
+        wcs = hscAstrom.fitTAN(matchList, True if debugging else False)
         print wcs.pixelScale()
 
         if debugging: show(exposure, wcs, sources, cat, matches=matchList, frame=2)
