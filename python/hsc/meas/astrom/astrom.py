@@ -25,9 +25,9 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
         dtype=int,
         default=50, min=0)
     matchingRadius = RangeField(
-        doc="Radius within which to consider matches (pixels)",
+        doc="Radius within which to accept matches (pixels)",
         dtype=float,
-        default=100.0, min=0.0)
+        default=10.0, min=0.0)
     calculateSip = Field(
         doc='''Compute polynomial SIP distortion terms?''',
         dtype=bool,
@@ -35,7 +35,7 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
     sipOrder = RangeField(
         doc='''Polynomial order of SIP distortion terms''',
         dtype=int,
-        default=4, min=2)
+        default=4, min=1)
     # Set these for proper operation of overridden astrometry class
     useWcsPixelScale = True
     useWcsRaDecCenter = True
@@ -91,9 +91,33 @@ class TaburAstrometry(measAst.Astrometry):
         if matchList is None or len(matchList) == 0:
             raise RuntimeError("Unable to match sources")
         if self.log: self.log.log(self.log.INFO, "Matched %d sources" % len(matchList))
-        wcs = hscAstrom.fitTAN(matchList)
+
+        if debugging:
+            import numpy
+            dr = numpy.ndarray(len(matchList))
+            for i, m in enumerate(matchList):
+                pix = wcs.skyToPixel(m.first.getRaDec())
+                dx = pix[0] - m.second.getXAstrom()
+                dy = pix[1] - m.second.getYAstrom()
+                dr[i] = numpy.hypot(dx, dy)
+            print dr.mean(), dr.std(), len(matchList)
+
+
+        print wcs.pixelScale()
+        wcs = hscAstrom.fitTAN(matchList, True)# if debugging else False)
+        print wcs.pixelScale()
 
         if debugging: show(exposure, wcs, sources, cat, matches=matchList, frame=2)
+
+        if True:
+            import numpy
+            dr = numpy.ndarray(len(matchList))
+            for i, m in enumerate(matchList):
+                pix = wcs.skyToPixel(m.first.getRaDec())
+                dx = pix[0] - m.second.getXAstrom()
+                dy = pix[1] - m.second.getYAstrom()
+                dr[i] = numpy.hypot(dx, dy)
+            print dr.mean(), dr.std(), len(matchList)
 
         astrom = measAst.InitialAstrometry()
         astrom.tanMatches = matchList
