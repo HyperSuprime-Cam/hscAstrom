@@ -48,16 +48,22 @@ def goodStar(s):
 
 def show(exposure, wcs, sources, catalog, matches=[], frame=1):
     import lsst.afw.display.ds9 as ds9
+    import numpy
     ds9.mtv(exposure, frame=frame)
     for s in sources:
         ds9.dot("o", s.getXAstrom(), s.getYAstrom(), frame=frame, ctype=ds9.GREEN)
     for s in catalog:
         pix = wcs.skyToPixel(s.getRaDec())
         ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.RED)
-    for m in matches:
+    dr = numpy.ndarray(len(matchList))
+    for i, m in enumerate(matches):
         pix = wcs.skyToPixel(m.first.getRaDec())
         ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.YELLOW)
         ds9.dot("+", m.second.getXAstrom(), m.second.getYAstrom(), frame=frame, ctype=ds9.YELLOW)
+        dx = pix[0] - m.second.getXAstrom()
+        dy = pix[1] - m.second.getYAstrom()
+        dr[i] = numpy.hypot(dx, dy)
+    print dr.mean(), dr.std(), len(matches)
 
 class TaburAstrometry(measAst.Astrometry):
     """Star matching using algorithm based on V.Tabur 2007, PASA, 24, 189-198
@@ -92,32 +98,9 @@ class TaburAstrometry(measAst.Astrometry):
             raise RuntimeError("Unable to match sources")
         if self.log: self.log.log(self.log.INFO, "Matched %d sources" % len(matchList))
 
-        if debugging:
-            import numpy
-            dr = numpy.ndarray(len(matchList))
-            for i, m in enumerate(matchList):
-                pix = wcs.skyToPixel(m.first.getRaDec())
-                dx = pix[0] - m.second.getXAstrom()
-                dy = pix[1] - m.second.getYAstrom()
-                dr[i] = numpy.hypot(dx, dy)
-            print dr.mean(), dr.std(), len(matchList)
-
-
-        print wcs.pixelScale()
         wcs = hscAstrom.fitTAN(matchList, True if debugging else False)
-        print wcs.pixelScale()
 
         if debugging: show(exposure, wcs, sources, cat, matches=matchList, frame=2)
-
-        if True:
-            import numpy
-            dr = numpy.ndarray(len(matchList))
-            for i, m in enumerate(matchList):
-                pix = wcs.skyToPixel(m.first.getRaDec())
-                dx = pix[0] - m.second.getXAstrom()
-                dy = pix[1] - m.second.getYAstrom()
-                dr[i] = numpy.hypot(dx, dy)
-            print dr.mean(), dr.std(), len(matchList)
 
         astrom = measAst.InitialAstrometry()
         astrom.tanMatches = matchList
