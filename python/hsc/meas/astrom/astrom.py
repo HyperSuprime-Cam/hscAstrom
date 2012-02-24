@@ -50,20 +50,24 @@ def show(exposure, wcs, sources, catalog, matches=[], frame=1):
     import lsst.afw.display.ds9 as ds9
     import numpy
     ds9.mtv(exposure, frame=frame)
-    for s in sources:
-        ds9.dot("o", s.getXAstrom(), s.getYAstrom(), frame=frame, ctype=ds9.GREEN)
-    for s in catalog:
-        pix = wcs.skyToPixel(s.getRaDec())
-        ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.RED)
-    dr = numpy.ndarray(len(matchList))
-    for i, m in enumerate(matches):
-        pix = wcs.skyToPixel(m.first.getRaDec())
-        ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.YELLOW)
-        ds9.dot("+", m.second.getXAstrom(), m.second.getYAstrom(), frame=frame, ctype=ds9.YELLOW)
-        dx = pix[0] - m.second.getXAstrom()
-        dy = pix[1] - m.second.getYAstrom()
-        dr[i] = numpy.hypot(dx, dy)
-    print dr.mean(), dr.std(), len(matches)
+    with ds9.Buffering():
+        for s in sources:
+            ds9.dot("o", s.getXAstrom(), s.getYAstrom(), frame=frame, ctype=ds9.GREEN)
+        for s in catalog:
+            pix = wcs.skyToPixel(s.getRaDec())
+            ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.RED)
+
+    if matches:
+        dr = numpy.ndarray(len(matches))
+        with ds9.Buffering():
+            for i, m in enumerate(matches):
+                pix = wcs.skyToPixel(m.first.getRaDec())
+                ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.YELLOW)
+                ds9.dot("+", m.second.getXAstrom(), m.second.getYAstrom(), frame=frame, ctype=ds9.YELLOW)
+                dx = pix[0] - m.second.getXAstrom()
+                dy = pix[1] - m.second.getYAstrom()
+                dr[i] = numpy.hypot(dx, dy)
+        print dr.mean(), dr.std(), len(matches)
 
 class TaburAstrometry(measAst.Astrometry):
     """Star matching using algorithm based on V.Tabur 2007, PASA, 24, 189-198
