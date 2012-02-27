@@ -6,6 +6,7 @@ import lsst.meas.algorithms as measAlg
 import lsst.meas.astrom.astrom as measAst
 import hsc.meas.astrom.astromLib as hscAstrom
 from lsst.pex.config import Config, Field, RangeField
+import lsst.pipe.tasks.distortion as pipeDist
 
 class TaburAstrometryConfig(measAst.MeasAstromConfig):
     numBrightStars = RangeField(
@@ -46,28 +47,51 @@ def goodStar(s):
     return s.getXAstrom() == s.getXAstrom() and not (s.getFlagForDetection() & measAlg.Flags.SATUR)
 
 
-def show(exposure, wcs, sources, catalog, matches=[], frame=1):
+def show(debug, exposure, wcs, sources, catalog, matches=[], frame=1, title=""):
     import lsst.afw.display.ds9 as ds9
     import numpy
-    ds9.mtv(exposure, frame=frame)
-    with ds9.Buffering():
-        for s in sources:
-            ds9.dot("o", s.getXAstrom(), s.getYAstrom(), frame=frame, ctype=ds9.GREEN)
-        for s in catalog:
-            pix = wcs.skyToPixel(s.getRaDec())
-            ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.RED)
 
-    if matches:
-        dr = numpy.ndarray(len(matches))
-        with ds9.Buffering():
+    if not debug.display:
+        return
+
+    ds9.mtv(exposure, frame=frame, title=title)
+
+    distorter = pipeDist.RadialPolyDistorter(exposure.getDetector())
+
+    with ds9.Buffering():
+        if matches:
+            for s in sources:
+                x, y = distorter.toObserved(s.getXAstrom(), s.getYAstrom())
+                ds9.dot("+", x,  y,  frame=frame, ctype=ds9.GREEN)
+
+            for s in catalog:
+                x, y = wcs.skyToPixel(s.getRaDec())
+                x, y = distorter.toObserved(x, y)
+                ds9.dot("x", x, y, size=3, frame=frame, ctype=ds9.RED)
+
+            dr = numpy.ndarray(len(matches))
+
             for i, m in enumerate(matches):
+                x, y = m.second.getXAstrom(), m.second.getYAstrom()
                 pix = wcs.skyToPixel(m.first.getRaDec())
-                ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.YELLOW)
-                ds9.dot("+", m.second.getXAstrom(), m.second.getYAstrom(), frame=frame, ctype=ds9.YELLOW)
-                dx = pix[0] - m.second.getXAstrom()
-                dy = pix[1] - m.second.getYAstrom()
-                dr[i] = numpy.hypot(dx, dy)
-        print dr.mean(), dr.std(), len(matches)
+
+                dr[i] = numpy.hypot(pix[0] - x, pix[1] - y)
+
+                x, y = distorter.toObserved(x, y)
+                ds9.dot("o", x,  y, size=4, frame=frame, ctype=ds9.YELLOW)
+                
+            print "<dr> = %.4g +- %.4g [%d matches]" % (dr.mean(), dr.std(), len(matches))
+        else:
+            for s in sources:
+                x0, y0 = s.getXAstrom(), s.getYAstrom()
+                x, y = distorter.toObserved(x0, y0)
+                ds9.dot("+", x0, y0, size=3, frame=frame, ctype=ds9.GREEN)
+                ds9.dot("o", x,  y,  frame=frame, ctype=ds9.GREEN)
+                ds9.line([(x0, y0), (x, y)], frame=frame, ctype=ds9.GREEN)
+
+            for s in catalog:
+                pix = wcs.skyToPixel(s.getRaDec())
+                ds9.dot("x", pix[0], pix[1], size=3, frame=frame, ctype=ds9.RED)
 
 class TaburAstrometry(measAst.Astrometry):
     """Star matching using algorithm based on V.Tabur 2007, PASA, 24, 189-198
@@ -77,6 +101,7 @@ class TaburAstrometry(measAst.Astrometry):
 
     def determineWcs(self, sources, exposure):
         import lsstDebug
+        debug = lsstDebug.Info(__name__)
         debugging = lsstDebug.Info(__name__).display
         
         wcs = exposure.getWcs() # Guess WCS
@@ -94,7 +119,8 @@ class TaburAstrometry(measAst.Astrometry):
         minNumMatchedPair = min(self.config.minMatchedPairNumber,
                                 int(self.config.minMatchedPairFrac * len(cat)))
 
-        if debugging: show(exposure, wcs, sources, cat, frame=1)
+        show(debug, exposure, wcs, sources, cat,
+             frame=debug.frame1 if isinstance(debug.frame1, int) else 1, title="Input catalog")
 
         matchList = hscAstrom.match(sources, cat, self.config.numBrightStars, minNumMatchedPair,
                                     self.config.matchingRadius)
@@ -104,7 +130,9 @@ class TaburAstrometry(measAst.Astrometry):
 
         wcs = hscAstrom.fitTAN(matchList, True if debugging else False)
 
-        if debugging: show(exposure, wcs, sources, cat, matches=matchList, frame=2)
+        if debug.showLinear:
+            show(debug, exposure, wcs, sources, cat, matches=matchList,
+                 frame=debug.frame2 if isinstance(debug.frame2, int) else 2, title="Linear matches")
 
         astrom = measAst.InitialAstrometry()
         astrom.tanMatches = matchList
@@ -124,7 +152,9 @@ class TaburAstrometry(measAst.Astrometry):
         for m in matchList:
             astrom.matches.push_back(m)
 
-        if debugging: show(exposure, wcs, sources, cat, matches=matchList, frame=3)
+        if self.config.calculateSip:
+            show(debug, exposure, wcs, sources, cat, matches=matchList,
+                 frame=debug.frame3 if isinstance(debug.frame3, int) else 3, title="SIP matches")
 
         return astrom
 
