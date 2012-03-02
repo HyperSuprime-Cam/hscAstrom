@@ -4,27 +4,27 @@
 
 #include <vector>
 #include <cmath>
-#include "lsst/afw/detection/Source.h"
-#include "lsst/afw/detection/SourceMatch.h"
+#include "lsst/afw/table/Source.h"
+#include "lsst/afw/table/Match.h"
 
 namespace hsc {
   namespace meas {
     namespace astrom {
 
 	struct SourcePair {
-	    lsst::afw::detection::Source::Ptr first;
-	    lsst::afw::detection::Source::Ptr second;
+	    CONST_PTR(lsst::afw::table::SourceRecord) first;
+	    CONST_PTR(lsst::afw::table::SourceRecord) second;
 	    double distance;
 	    double pa;
 	    double deltaD;
 
-	    SourcePair(lsst::afw::detection::Source::Ptr const & s1,
-		       lsst::afw::detection::Source::Ptr const & s2)
+	    SourcePair(CONST_PTR(lsst::afw::table::SourceRecord) s1,
+		       CONST_PTR(lsst::afw::table::SourceRecord) s2)
 		: first(s1), second(s2) {
-		double x1 = first->getXAstrom();
-		double y1 = first->getYAstrom();
-		double x2 = second->getXAstrom();
-		double y2 = second->getYAstrom();
+		double x1 = first->getX();
+		double y1 = first->getY();
+		double x2 = second->getX();
+		double y2 = second->getY();
 		distance = sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
 		pa = atan2(y2-y1, x2-x1);
 	    }
@@ -32,14 +32,14 @@ namespace hsc {
 	};
 	    
 
-	lsst::afw::detection::SourceSet
-	  selectPoint(lsst::afw::detection::SourceSet const &a,
+	lsst::afw::table::SourceCatalog
+	  selectPoint(lsst::afw::table::SourceCatalog const &a,
 		      unsigned int n,
 		      unsigned int start = 0);
 
-	std::vector<lsst::afw::detection::SourceMatch>
-	  match(lsst::afw::detection::SourceSet const &src,
-		lsst::afw::detection::SourceSet const &cat,
+	lsst::afw::table::SourceMatchVector
+	  match(lsst::afw::table::SourceCatalog const &src,
+		lsst::afw::table::SourceCatalog const &cat,
 		int numBrightStars = 100,
 		unsigned int minNumMatchedPair = 50,
 		double matchingAllowanceInPixel = 10.,

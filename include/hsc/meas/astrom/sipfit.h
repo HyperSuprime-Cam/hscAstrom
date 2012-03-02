@@ -5,7 +5,7 @@
 #include <vector>
 #include "lsst/afw/image.h"
 #include "lsst/afw/geom.h"
-#include "lsst/afw/detection/SourceMatch.h"
+#include "lsst/afw/table/Match.h"
 
 namespace hsc {
     namespace meas {
@@ -13,13 +13,13 @@ namespace hsc {
 
 	    lsst::afw::image::Wcs::Ptr
 	      fitTANSIP(int order,
-			std::vector<lsst::afw::detection::SourceMatch> const &matPair,
+			lsst::afw::table::SourceMatchVector const &matPair,
 			lsst::afw::coord::Coord::Ptr &crval,
 			lsst::afw::geom::PointD &crpix,
 			bool verbose = false);
 
 	    lsst::afw::image::Wcs::Ptr
-	      fitTAN(std::vector<lsst::afw::detection::SourceMatch> const &matPair,
+	      fitTAN(lsst::afw::table::SourceMatchVector const &matPair,
 		     bool verbose = false);
 	}
     }

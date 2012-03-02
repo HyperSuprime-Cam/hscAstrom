@@ -1,13 +1,13 @@
 #include "fitsio.h"
 
 #include "hsc/meas/astrom/sipfit.h"
-#include "lsst/afw/detection/Source.h"
+#include "lsst/afw/table/Source.h"
 
 #define D2R (M_PI/180.)
 #define R2D (180./M_PI)
 
 using namespace hsc::meas::astrom;
-using namespace lsst::afw::detection;
+using namespace lsst::afw::table;
 namespace afwGeom = lsst::afw::geom;
 
 #include <gsl/gsl_linalg.h>
@@ -24,8 +24,8 @@ double calEta_A(double a, double d, double A, double D);
 double calEta_D(double a, double d, double A, double D);
 
 double *sipfit(int order,
-		SourceSet const &img,
-		SourceSet const &cat) {
+		SourceCatalog const &img,
+		SourceCatalog const &cat) {
     int ncoeff = (order + 1) * (order + 2) / 2 - 1;
     int *xorder = new int[ncoeff];
     int *yorder = new int[ncoeff];
@@ -43,34 +43,34 @@ double *sipfit(int order,
     double *a_data = new double[ncoeff*ncoeff];
     double *b_data = new double[ncoeff];
     double *c_data = new double[ncoeff];
-
+    Key< Covariance<Point<double> > > covKey = img.getTable()->getCentroidErrKey();
     for (int i = 0; i < ncoeff; i++) {
 	for (int j = 0; j < ncoeff; j++) {
 	    a_data[i*ncoeff+j] = 0.0;
 	    for (unsigned int k = 0; k < img.size(); k++) {
-		double w = img[k]->getXAstromErr();
+		double w = std::sqrt(img[k].get(covKey(0,0)));
 		if (w <= 0.0) w = 1.0;
-		a_data[i*ncoeff+j] += pow(img[k]->getXAstrom(), xorder[i]) * 
-		                      pow(img[k]->getYAstrom(), yorder[i]) * 
-		                      pow(img[k]->getXAstrom(), xorder[j]) * 
-		                      pow(img[k]->getYAstrom(), yorder[j]) * w;
+		a_data[i*ncoeff+j] += pow(img[k].getX(), xorder[i]) * 
+		                      pow(img[k].getY(), yorder[i]) * 
+		                      pow(img[k].getX(), xorder[j]) * 
+		                      pow(img[k].getY(), yorder[j]) * w;
 	    }
 	}
 	b_data[i] = c_data[i] = 0.0;
-	// Subtract img[k]->getXAstrom()
-        //          img[k]->getYAstrom() to
+	// Subtract img[k]->getX()
+        //          img[k]->getY() to
 	// account for Ap, Bp definition of TAN-SIP.
 	//     u = U + F(U)
         //     v = V + G(V)
 	for (unsigned int k = 0; k < img.size(); k++) {
-	    double w = img[k]->getXAstromErr();
+	    double w = std::sqrt(img[k].get(covKey(0,0)));
 	    if (w <= 0.0) w = 1.0;
-	    b_data[i] += pow(img[k]->getXAstrom(), xorder[i]) * 
-		         pow(img[k]->getYAstrom(), yorder[i]) * 
-		         (cat[k]->getXAstrom()-img[k]->getXAstrom()) * w;
-	    c_data[i] += pow(img[k]->getXAstrom(), xorder[i]) * 
-		         pow(img[k]->getYAstrom(), yorder[i]) * 
-		         (cat[k]->getYAstrom()-img[k]->getYAstrom()) * w;
+	    b_data[i] += pow(img[k].getX(), xorder[i]) * 
+		         pow(img[k].getY(), yorder[i]) * 
+		         (cat[k].getX()-img[k].getX()) * w;
+	    c_data[i] += pow(img[k].getX(), xorder[i]) * 
+		         pow(img[k].getY(), yorder[i]) * 
+		         (cat[k].getY()-img[k].getY()) * w;
 	}
     }
 
@@ -114,13 +114,11 @@ double *sipfit(int order,
 
 lsst::afw::image::Wcs::Ptr
 hsc::meas::astrom::fitTANSIP(int order,
-			     std::vector<SourceMatch> const &matPair,
+			     SourceMatchVector const &matPair,
 			     lsst::afw::coord::Coord::Ptr &crvalo,
 			     lsst::afw::geom::PointD &crpixo,
 			     bool verbose) {
     int npair = matPair.size();
-    SourceSet img;
-    SourceSet cat;
     std::vector<int> flag;
     double *x = new double[npair];
     double *y = new double[npair];
@@ -162,16 +160,16 @@ hsc::meas::astrom::fitTANSIP(int order,
     int iexp = 0; int nexp = 1;
     double w1 = 1.0;
     for (int i = 0; i < npair; i++) {
-	ra = matPair[i].first->getRaDec()->getLongitude().asRadians();
-	dec = matPair[i].first->getRaDec()->getLatitude().asRadians();
+	ra = matPair[i].first->getRa().asRadians();
+	dec = matPair[i].first->getDec().asRadians();
 	double xi    = calXi  (ra, dec, crval[0], crval[1]);
 	double xi_A  = calXi_A(ra, dec, crval[0], crval[1]);
 	double xi_D  = calXi_D(ra, dec, crval[0], crval[1]);
 	double eta   = calEta  (ra, dec, crval[0], crval[1]);
 	double eta_A = calEta_A(ra, dec, crval[0], crval[1]);
 	double eta_D = calEta_D(ra, dec, crval[0], crval[1]);
-	double u = matPair[i].second->getXAstrom() - crpix[0];
-	double v = matPair[i].second->getYAstrom() - crpix[1];
+	double u = matPair[i].second->getX() - crpix[0];
+	double v = matPair[i].second->getY() - crpix[1];
 	int i0 = ncoeff * 2 * iexp;
 	for (int k = 0; k < ncoeff; k++) {
 	    for (int l = 0; l < ncoeff; l++) {
@@ -250,23 +248,24 @@ hsc::meas::astrom::fitTANSIP(int order,
 	std::cout << sipB << std::endl << std::endl;
     }
 
-    cat.clear();
+    SourceCatalog cat(matPair.;
+    SourceCatalog img;
+    Key< Point<double> > xyKey = img.getTable()->getCentroidKey();
     for (int i = 0; i < npair; i++) {
-	ra  = matPair[i].first->getRaDec()->getLongitude().asRadians();
-	dec = matPair[i].first->getRaDec()->getLatitude().asRadians();
+	ra  = matPair[i].first->getRa().asRadians();
+	dec = matPair[i].first->getDec().asRadians();
 	x[i] = calXi(ra, dec, crval[0], crval[1]);
 	y[i] = calEta(ra, dec, crval[0], crval[1]);
 	double D = cd(0,0) * cd(1,1) - cd(0,1) * cd(1,0);
-	Source::Ptr s = Source::Ptr(new Source());
-	s->setXAstrom(( cd(1,1)*x[i]-cd(0,1)*y[i])/D);
-	s->setYAstrom((-cd(1,0)*x[i]+cd(0,0)*y[i])/D);
+	PTR(SourceRecord) s;
+	s->set(xyKey, Point2D(( cd(1,1)*x[i]-cd(0,1)*y[i])/D,
+                              (-cd(1,0)*x[i]+cd(0,0)*y[i])/D));
 	cat.push_back(s);
 
-	u[i] = matPair[i].second->getXAstrom() - crpix[0];
-	v[i] = matPair[i].second->getYAstrom() - crpix[1];
-	Source::Ptr s2 = Source::Ptr(new Source());
-	s2->setXAstrom(u[i]);
-	s2->setYAstrom(v[i]);
+	u[i] = matPair[i].second->getX() - crpix[0];
+	v[i] = matPair[i].second->getY() - crpix[1];
+	PTR(SourceRecord) s2;
+	s2->set(xyKey, Point2D(u[i], v[i]));
 	img.push_back(s2);
     }
     coeff = sipfit(order, cat, img);
@@ -311,11 +310,11 @@ hsc::meas::astrom::fitTANSIP(int order,
 }
 
 lsst::afw::image::Wcs::Ptr
-hsc::meas::astrom::fitTAN(std::vector<SourceMatch> const &matPair,
+hsc::meas::astrom::fitTAN(SourceMatchVector const &matPair,
 			  bool verbose) {
     int npair = matPair.size();
-    SourceSet img;
-    SourceSet cat;
+    SourceCatalog img;
+    SourceCatalog cat;
     double *x = new double[npair];
     double *y = new double[npair];
     double *u = new double[npair];
@@ -326,10 +325,10 @@ hsc::meas::astrom::fitTAN(std::vector<SourceMatch> const &matPair,
     double Sx = 0.0;
     double Sy = 0.0;
     for (int i = 0; i < npair; i++) {
-	Sra  += matPair[i].first->getRaDec()->getLongitude().asRadians();
-	Sdec += matPair[i].first->getRaDec()->getLatitude().asRadians();
-	Sx += matPair[i].second->getXAstrom();
-	Sy += matPair[i].second->getYAstrom();
+	Sra  += matPair[i].first->getRa().asRadians();
+	Sdec += matPair[i].first->getDec().asRadians();
+	Sx += matPair[i].second->getX();
+	Sy += matPair[i].second->getY();
     }
     // XXX This may be problematic if we span the RA=0 line or a pole
     lsst::afw::geom::PointD crval = lsst::afw::geom::Point2D(Sra/npair, Sdec/npair);
@@ -365,16 +364,16 @@ hsc::meas::astrom::fitTAN(std::vector<SourceMatch> const &matPair,
     int iexp = 0; int nexp = 1;
     double w1 = 1.0;
     for (int i = 0; i < npair; i++) {
-	double ra = matPair[i].first->getRaDec()->getLongitude().asRadians();
-	double dec = matPair[i].first->getRaDec()->getLatitude().asRadians();
+	double ra = matPair[i].first->getRa().asRadians();
+	double dec = matPair[i].first->getDec().asRadians();
 	double xi    = calXi  (ra, dec, crval[0], crval[1]);
 	double xi_A  = calXi_A(ra, dec, crval[0], crval[1]);
 	double xi_D  = calXi_D(ra, dec, crval[0], crval[1]);
 	double eta   = calEta  (ra, dec, crval[0], crval[1]);
 	double eta_A = calEta_A(ra, dec, crval[0], crval[1]);
 	double eta_D = calEta_D(ra, dec, crval[0], crval[1]);
-	double u = matPair[i].second->getXAstrom() - crpix[0];
-	double v = matPair[i].second->getYAstrom() - crpix[1];
+	double u = matPair[i].second->getX() - crpix[0];
+	double v = matPair[i].second->getY() - crpix[1];
 	int i0 = ncoeff * 2 * iexp;
 	for (int k = 0; k < ncoeff; k++) {
 	    for (int l = 0; l < ncoeff; l++) {
