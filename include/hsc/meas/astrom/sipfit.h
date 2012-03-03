@@ -13,13 +13,13 @@ namespace hsc {
 
 	    lsst::afw::image::Wcs::Ptr
 	      fitTANSIP(int order,
-			lsst::afw::table::SourceMatchVector const &matPair,
-			lsst::afw::coord::Coord::Ptr &crval,
+			lsst::afw::table::ReferenceMatchVector const &matPair,
+			lsst::afw::coord::Coord &crval,
 			lsst::afw::geom::PointD &crpix,
 			bool verbose = false);
 
 	    lsst::afw::image::Wcs::Ptr
-	      fitTAN(lsst::afw::table::SourceMatchVector const &matPair,
+	      fitTAN(lsst::afw::table::ReferenceMatchVector const &matPair,
 		     bool verbose = false);
 	}
     }

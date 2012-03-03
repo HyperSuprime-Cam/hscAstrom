@@ -43,7 +43,8 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
 
 
 def goodStar(s):
-    return s.getXAstrom() == s.getXAstrom() and not (s.getFlagForDetection() & measAlg.Flags.SATUR)
+    # FIXME: should use Key to get flag (but then we'd need schema in advance)
+    return s.getX() == s.getX() and not s.get("flags.pixel.saturated")
 
 
 def show(exposure, wcs, sources, catalog, matches=[], frame=1):
@@ -51,7 +52,7 @@ def show(exposure, wcs, sources, catalog, matches=[], frame=1):
     import numpy
     ds9.mtv(exposure, frame=frame)
     for s in sources:
-        ds9.dot("o", s.getXAstrom(), s.getYAstrom(), frame=frame, ctype=ds9.GREEN)
+        ds9.dot("o", s.getX(), s.getY(), frame=frame, ctype=ds9.GREEN)
     for s in catalog:
         pix = wcs.skyToPixel(s.getRaDec())
         ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.RED)
@@ -59,9 +60,9 @@ def show(exposure, wcs, sources, catalog, matches=[], frame=1):
     for i, m in enumerate(matches):
         pix = wcs.skyToPixel(m.first.getRaDec())
         ds9.dot("x", pix[0], pix[1], frame=frame, ctype=ds9.YELLOW)
-        ds9.dot("+", m.second.getXAstrom(), m.second.getYAstrom(), frame=frame, ctype=ds9.YELLOW)
-        dx = pix[0] - m.second.getXAstrom()
-        dy = pix[1] - m.second.getYAstrom()
+        ds9.dot("+", m.second.getX(), m.second.getY(), frame=frame, ctype=ds9.YELLOW)
+        dx = pix[0] - m.second.getX()
+        dy = pix[1] - m.second.getY()
         dr[i] = numpy.hypot(dx, dy)
     print dr.mean(), dr.std(), len(matches)
 
@@ -116,7 +117,7 @@ class TaburAstrometry(measAst.Astrometry):
 
         astrom.matchMetadata = measAst._createMetadata(imageSize[0], imageSize[1], wcs, filterName)
         astrom.wcs = wcs
-        astrom.matches = afwDet.SourceMatchVector()
+        astrom.matches = afwTable.ReferenceMatchVector()
         for m in matchList:
             astrom.matches.push_back(m)
 
