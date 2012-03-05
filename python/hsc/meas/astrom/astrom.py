@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 import lsst.daf.base as dafBase
-import lsst.afw.detection as afwDet
+import lsst.afw.table as afwTable
 import lsst.meas.algorithms as measAlg
-import lsst.meas.astrom.astrom as measAst
-import hsc.meas.astrom.astromLib as hscAstrom
+import lsst.meas.astrom as measAst
+from . import astromLib as hscAstrom
 from lsst.pex.config import Config, Field, RangeField
 
 class TaburAstrometryConfig(measAst.MeasAstromConfig):
@@ -44,8 +44,7 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
 
 def goodStar(s):
     # FIXME: should use Key to get flag (but then we'd need schema in advance)
-    return s.getX() == s.getX() and not s.get("flags.pixel.saturated")
-
+    return s.getX() == s.getX() and not s.get("flags.pixel.saturated.any")
 
 def show(exposure, wcs, sources, catalog, matches=[], frame=1):
     import lsst.afw.display.ds9 as ds9
@@ -84,7 +83,10 @@ class TaburAstrometry(measAst.Astrometry):
         cat = self.getReferenceSourcesForWcs(wcs, imageSize, filterName, self.config.pixelMargin)
         if self.log: self.log.log(self.log.INFO, "Found %d catalog sources" % len(cat))
 
-        sources = [s for s in sources if goodStar(s)]
+        allSources = sources
+        sources = afwTable.SourceCatalog(sources.table)
+        sources.extend(s for s in allSources if goodStar(s))
+        
         if self.log: self.log.log(self.log.INFO, "Matching to %d good input sources" % len(sources))
 
         numBrightStars = max(self.config.numBrightStars, len(sources))
@@ -93,7 +95,7 @@ class TaburAstrometry(measAst.Astrometry):
 
         if debugging: show(exposure, wcs, sources, cat, frame=1)
 
-        matchList = hscAstrom.match(sources, cat, self.config.numBrightStars, minNumMatchedPair,
+        matchList = hscAstrom.match(cat, sources, wcs, self.config.numBrightStars, minNumMatchedPair,
                                     self.config.matchingRadius)
         if matchList is None or len(matchList) == 0:
             raise RuntimeError("Unable to match sources")
@@ -103,7 +105,7 @@ class TaburAstrometry(measAst.Astrometry):
 
         if debugging: show(exposure, wcs, sources, cat, matches=matchList, frame=2)
 
-        astrom = measAst.InitialAstrometry()
+        astrom = measAst.astrom.InitialAstrometry()
         astrom.tanMatches = matchList
         astrom.tanWcs = wcs
         astrom.solveQa = dafBase.PropertyList()
@@ -115,7 +117,7 @@ class TaburAstrometry(measAst.Astrometry):
 
         exposure.setWcs(wcs)
 
-        astrom.matchMetadata = measAst._createMetadata(imageSize[0], imageSize[1], wcs, filterName)
+        astrom.matchMetadata = measAst.astrom._createMetadata(imageSize[0], imageSize[1], wcs, filterName)
         astrom.wcs = wcs
         astrom.matches = afwTable.ReferenceMatchVector()
         for m in matchList:

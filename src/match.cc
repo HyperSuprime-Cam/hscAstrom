@@ -343,6 +343,26 @@ ReferenceMatchVector FinalVerify(
 
 } // anonymous namespace
 
+
+ProxyVector hsc::meas::astrom::makeProxies(SourceCatalog const & sources) {
+    ProxyVector r;
+    r.reserve(sources.size());
+    for (SourceCatalog::const_iterator i = sources.begin(); i != sources.end(); ++i) {
+        r.push_back(RecordProxy(i, i->getCentroid()));
+    }
+    return r;
+}
+
+ProxyVector hsc::meas::astrom::makeProxies(SimpleCatalog const & refs, lsst::afw::image::Wcs const & wcs) {
+    ProxyVector r;
+    r.reserve(refs.size());
+    for (SimpleCatalog::const_iterator i = refs.begin(); i != refs.end(); ++i) {
+        r.push_back(RecordProxy(i, wcs.skyToPixel(i->getCoord())));
+    }
+    return r;
+}
+
+
 ReferenceMatchVector
 hsc::meas::astrom::match(
     SimpleCatalog const &cat,

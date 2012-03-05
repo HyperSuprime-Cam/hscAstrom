@@ -14,8 +14,8 @@ namespace hsc {
 	    lsst::afw::image::Wcs::Ptr
 	      fitTANSIP(int order,
 			lsst::afw::table::ReferenceMatchVector const &matPair,
-			lsst::afw::coord::Coord &crval,
-			lsst::afw::geom::PointD &crpix,
+			lsst::afw::coord::Coord const &crval,
+			lsst::afw::geom::PointD const &crpix,
 			bool verbose = false);
 
 	    lsst::afw::image::Wcs::Ptr

@@ -303,7 +303,7 @@ fitTANSIP(int order,
 }
 
 lsst::afw::image::Wcs::Ptr
-fitTAN(SourceMatchVector const &matPair,
+fitTAN(ReferenceMatchVector const &matPair,
        bool verbose) {
     int npair = matPair.size();
     ProxyVector img;
