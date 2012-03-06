@@ -72,7 +72,7 @@ ProxyVector selectPoint(
     CompareProxyFlux cmp = {key};
     ProxyVector b(a);
     std::sort(b.begin(), b.end(), cmp);
-    std::size_t end = std::max(start + num, b.size());
+    std::size_t end = std::min(start + num, b.size());
     return ProxyVector(b.begin() + start, b.begin() + end);
 }
 
