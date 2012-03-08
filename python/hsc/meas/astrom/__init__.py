@@ -1,2 +1,2 @@
-from determineWcs import *
-from astromLib import *
+from .astromLib import *
+from .astrom import *
