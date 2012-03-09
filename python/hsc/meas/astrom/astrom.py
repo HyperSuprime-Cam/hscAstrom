@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import numpy
 import lsst.daf.base as dafBase
 import lsst.afw.table as afwTable
 import lsst.meas.algorithms as measAlg
@@ -44,11 +45,10 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
 
 def goodStar(s):
     # FIXME: should use Key to get flag (but then we'd need schema in advance)
-    return s.getX() == s.getX() and not s.get("flags.pixel.saturated.any")
+    return numpy.isfinite(s.getX()) and numpy.isfinite(s.getY()) and not s.get("flags.pixel.saturated.any")
 
 def show(exposure, wcs, sources, catalog, matches=[], frame=1):
     import lsst.afw.display.ds9 as ds9
-    import numpy
     ds9.mtv(exposure, frame=frame)
     for s in sources:
         ds9.dot("o", s.getX(), s.getY(), frame=frame, ctype=ds9.GREEN)
