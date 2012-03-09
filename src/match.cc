@@ -22,28 +22,24 @@ namespace {
 // Algorithm is based on V.Tabur 2007, PASA, 24, 189-198
 // "Fast Algorithms for Matching CCD Images to a Stellar Catalogue"
 
-// Compair Source based on its PsfFlux
-// Ordering is bright to faint
-bool cmpSrc(SourceRecord const& a, SourceRecord const& b) {
-    float aFlux = a.getPsfFlux();
-    float bFlux = b.getPsfFlux();
-    if (lsst::utils::isnan(aFlux)) {
-        aFlux = 0.0;
-    }
-    if (lsst::utils::isnan(bFlux)) { 
-        bFlux = 0.0;
-    }
-    return aFlux > bFlux;
-}
-
 bool cmpPair(ProxyPair const &a, ProxyPair const &b) {
     return a.distance > b.distance;
 }
 
+// Compair Source based on its PsfFlux
+// Ordering is bright to faint
 struct CompareProxyFlux {
 
     bool operator()(RecordProxy const & a, RecordProxy const & b) const {
-        return a.record->get(key) < b.record->get(key);
+        double aFlux = a.record->get(key);
+        double bFlux = b.record->get(key);
+        if (lsst::utils::isnan(aFlux)) {
+            aFlux = 0.0;
+        }
+        if (lsst::utils::isnan(bFlux)) { 
+            bFlux = 0.0;
+        }
+        return aFlux > bFlux;
     }
 
     Key<double> key;
