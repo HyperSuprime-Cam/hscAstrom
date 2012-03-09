@@ -22,6 +22,7 @@ namespace hsc {
     // computes for the reference object from the initial WCS.
 
     struct RecordProxy {
+        explicit RecordProxy() {}                // needed so we can call RecordProxy::resize()
         PTR(lsst::afw::table::SimpleRecord) record;
         lsst::afw::geom::Point2D position;
 
