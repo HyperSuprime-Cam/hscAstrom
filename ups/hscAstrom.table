@@ -1,6 +1,7 @@
 setupRequired(python)
 setupRequired(sconsUtils)
 
+setupRequired(meas_astrom)
 setupRequired(boost)
 setupRequired(gsl)
 setupRequired(afw)
