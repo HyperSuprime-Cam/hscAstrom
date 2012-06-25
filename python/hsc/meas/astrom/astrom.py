@@ -62,19 +62,19 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], frame=1, title=""):
     with ds9.Buffering():
         if matches:
             for s in sources:
-                x, y = distorter.toObserved(s.getXAstrom(), s.getYAstrom())
+                x, y = distorter.toObserved(s.getX(), s.getY())
                 ds9.dot("+", x,  y,  frame=frame, ctype=ds9.GREEN)
 
             for s in catalog:
-                x, y = wcs.skyToPixel(s.getRaDec())
+                x, y = wcs.skyToPixel(s.getCoord())
                 x, y = distorter.toObserved(x, y)
                 ds9.dot("x", x, y, size=3, frame=frame, ctype=ds9.RED)
 
             dr = numpy.ndarray(len(matches))
 
             for i, m in enumerate(matches):
-                x, y = m.second.getXAstrom(), m.second.getYAstrom()
-                pix = wcs.skyToPixel(m.first.getRaDec())
+                x, y = m.second.getX(), m.second.getY()
+                pix = wcs.skyToPixel(m.first.getCoord())
 
                 dr[i] = numpy.hypot(pix[0] - x, pix[1] - y)
 
@@ -84,14 +84,14 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], frame=1, title=""):
             print "<dr> = %.4g +- %.4g [%d matches]" % (dr.mean(), dr.std(), len(matches))
         else:
             for s in sources:
-                x0, y0 = s.getXAstrom(), s.getYAstrom()
+                x0, y0 = s.getX(), s.getY()
                 x, y = distorter.toObserved(x0, y0)
                 ds9.dot("+", x0, y0, size=3, frame=frame, ctype=ds9.GREEN)
                 ds9.dot("o", x,  y,  frame=frame, ctype=ds9.GREEN)
                 ds9.line([(x0, y0), (x, y)], frame=frame, ctype=ds9.GREEN)
 
             for s in catalog:
-                pix = wcs.skyToPixel(s.getRaDec())
+                pix = wcs.skyToPixel(s.getCoord())
                 ds9.dot("x", pix[0], pix[1], size=3, frame=frame, ctype=ds9.RED)
 
 class TaburAstrometry(measAst.Astrometry):
