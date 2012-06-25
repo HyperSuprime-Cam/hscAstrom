@@ -8,9 +8,13 @@ syntax: glob
 *.os
 *.la
 *.a
+python/hsc/meas/astrom/astromLib.py
+python/hsc/meas/astrom/astromLib_wrap.cc
+python/hsc/meas/astrom/version.py
+*.cfgc
 
 syntax: regexp
-^#.*#$
+^\#.*\#$
 ^\.fuse.*
 ^\.scon*
 ^\.config.log$
