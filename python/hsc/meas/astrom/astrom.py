@@ -117,7 +117,8 @@ class TaburAstrometry(measAst.Astrometry):
         sources = afwTable.SourceCatalog(sources.table)
         sources.extend(s for s in allSources if goodStar(s))
         
-        if self.log: self.log.log(self.log.INFO, "Matching to %d good input sources" % len(sources))
+        if self.log: self.log.log(self.log.INFO, "Matching to %d/%d good input sources" % 
+                                  (len(sources), len(allSources)))
 
         numBrightStars = max(self.config.numBrightStars, len(sources))
         minNumMatchedPair = min(self.config.minMatchedPairNumber,
@@ -126,11 +127,20 @@ class TaburAstrometry(measAst.Astrometry):
         show(debug, exposure, wcs, sources, cat,
              frame=debug.frame1 if isinstance(debug.frame1, int) else 1, title="Input catalog")
 
-        matchList = hscAstrom.match(cat, sources, wcs, self.config.numBrightStars, minNumMatchedPair,
-                                    self.config.matchingRadius)
-        if matchList is None or len(matchList) == 0:
-            raise RuntimeError("Unable to match sources")
+        try:
+            matchList = hscAstrom.match(cat, sources, wcs, self.config.numBrightStars, minNumMatchedPair,
+                                        self.config.matchingRadius)
+            if matchList is None or len(matchList) == 0:
+                raise RuntimeError("Unable to match sources")
+        except:
+            if self.log: self.log.info("Matching failed; retrying with saturated sources.")
+            matchList = hscAstrom.match(cat, allSources, wcs, self.config.numBrightStars, minNumMatchedPair,
+                                        self.config.matchingRadius)
+            if matchList is None or len(matchList) == 0:
+                raise RuntimeError("Unable to match sources")
+        
         if self.log: self.log.log(self.log.INFO, "Matched %d sources" % len(matchList))
+
 
         wcs = hscAstrom.fitTAN(matchList, True if debugging else False)
 
