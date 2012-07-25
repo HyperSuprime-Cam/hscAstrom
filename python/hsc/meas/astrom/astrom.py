@@ -8,6 +8,7 @@ import lsst.meas.astrom as measAst
 from . import astromLib as hscAstrom
 from lsst.pex.config import Config, Field, RangeField
 from lsst.pipe.tasks.detectorUtil import getCcd
+from lsst.meas.photocal.colorterms import Colorterm
 
 class TaburAstrometryConfig(measAst.MeasAstromConfig):
     numBrightStars = RangeField(
@@ -109,9 +110,13 @@ class TaburAstrometry(measAst.Astrometry):
         wcs = exposure.getWcs() # Guess WCS
         if wcs is None:
             raise RuntimeError("This matching algorithm requires an input guess WCS")
-        filterName = exposure.getFilter().getName()
-        imageSize = (exposure.getWidth(), exposure.getHeight())
-        cat = self.getReferenceSourcesForWcs(wcs, imageSize, filterName, self.config.pixelMargin)
+                
+        filterName,imageSize,x0,y0 = self._getImageParams(exposure=exposure, wcs=wcs)
+        cat = self.getReferenceSourcesForWcs(
+            wcs, imageSize, filterName, self.config.pixelMargin,
+            x0=x0, y0=y0,
+            allFluxes = (True if Colorterm.getColorterm(filterName) else False)
+            )
         if self.log: self.log.log(self.log.INFO, "Found %d catalog sources" % len(cat))
 
         allSources = sources
