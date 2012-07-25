@@ -7,7 +7,7 @@ import lsst.meas.algorithms as measAlg
 import lsst.meas.astrom as measAst
 from . import astromLib as hscAstrom
 from lsst.pex.config import Config, Field, RangeField
-import lsst.pipe.tasks.distortion as pipeDist
+from lsst.pipe.tasks.detectorUtil import getCcd
 
 class TaburAstrometryConfig(measAst.MeasAstromConfig):
     numBrightStars = RangeField(
@@ -57,7 +57,8 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], frame=1, title=""):
 
     ds9.mtv(exposure, frame=frame, title=title)
 
-    distorter = pipeDist.RadialPolyDistorter(exposure.getDetector())
+    ccd = getCcd(exposure, allowRaise=False)
+    distorter = ccd.getDistortion()
 
     with ds9.Buffering():
         if matches:
