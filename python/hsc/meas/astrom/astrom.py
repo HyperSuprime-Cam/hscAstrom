@@ -68,12 +68,17 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=T
     with ds9.Buffering():
         if matches:
             for s in sources:
-                x, y = distorter.distort(s.getCentroid(), ccd)
-                ds9.dot("+", x,  y,  frame=frame, ctype=ds9.GREEN)
+                xy = s.getCentroid()
+                if distorter:
+                    xy = distorter.distort(xy, ccd)
+
+                ds9.dot("+", *xy,  frame=frame, ctype=ds9.GREEN)
 
             for s in catalog:
-                x, y = distorter.distort(wcs.skyToPixel(s.getCoord()), ccd)
-                ds9.dot("x", x, y, size=3, frame=frame, ctype=ds9.RED)
+                xy = wcs.skyToPixel(s.getCoord())
+                if distorter:
+                    xy = distorter.distort(xy, ccd)
+                ds9.dot("x", *xy, size=3, frame=frame, ctype=ds9.RED)
 
             dr = numpy.ndarray(len(matches))
 
@@ -83,8 +88,9 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=T
 
                 dr[i] = numpy.hypot(pix[0] - xy[0], pix[1] - xy[1])
 
-                x, y = distorter.distort(xy, ccd)
-                ds9.dot("o", x,  y, size=4, frame=frame, ctype=ds9.YELLOW)
+                if distorter:
+                    xy = distorter.distort(xy, ccd)
+                ds9.dot("o", *xy, size=4, frame=frame, ctype=ds9.YELLOW)
                 
             print "<dr> = %.4g +- %.4g [%d matches]" % (dr.mean(), dr.std(), len(matches))
         else:
@@ -151,18 +157,22 @@ class TaburAstrometry(measAst.Astrometry):
         
         if self.log: self.log.log(self.log.INFO, "Matched %d sources" % len(matchList))
 
-
-        wcs = hscAstrom.fitTAN(matchList, True if debugging else False)
-
-        if debug.showLinear:
-            show(debug, exposure, wcs, sources, cat, matches=matchList,
-                 frame=debug.frame2 if isinstance(debug.frame2, int) else 2, title="Linear matches")
-
         astrom = measAst.astrom.InitialAstrometry()
-        astrom.tanMatches = matchList
-        astrom.tanWcs = wcs
         astrom.solveQa = dafBase.PropertyList()
 
+        if wcs.hasDistortion():         # no need to fit an initial pure-TAN wcs
+            astrom.tanMatches = None
+            astrom.tanWcs = None
+        else:
+            wcs = hscAstrom.fitTAN(matchList, True if debugging else False)
+
+            if debug.showLinear:
+                show(debug, exposure, wcs, sources, cat, matches=matchList,
+                     frame=debug.frame2 if isinstance(debug.frame2, int) else 2, title="Linear matches")
+
+            astrom.tanMatches = matchList
+            astrom.tanWcs = wcs
+            
         if self.config.calculateSip:
             wcs, matchList = self._calculateSipTerms(wcs, cat, sources, matchList)
             astrom.sipWcs = wcs
