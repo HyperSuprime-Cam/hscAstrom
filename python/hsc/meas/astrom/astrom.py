@@ -50,7 +50,7 @@ def goodStar(s):
     # FIXME: should use Key to get flag (but then we'd need schema in advance)
     return numpy.isfinite(s.getX()) and numpy.isfinite(s.getY()) and not s.get("flags.pixel.saturated.any")
 
-def show(debug, exposure, wcs, sources, catalog, matches=[], frame=1, title=""):
+def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=True, frame=1, title=""):
     import lsst.afw.display.ds9 as ds9
     import numpy
 
@@ -59,8 +59,11 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], frame=1, title=""):
 
     ds9.mtv(exposure, frame=frame, title=title)
 
-    ccd = getCcd(exposure, allowRaise=False)
-    distorter = ccd.getDistortion()
+    if correctDistortion:
+        ccd = getCcd(exposure, allowRaise=False)
+        distorter = ccd.getDistortion()
+    else:
+        distorter = None                # We already corrected for distortion
 
     with ds9.Buffering():
         if matches:
@@ -87,10 +90,11 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], frame=1, title=""):
         else:
             for s in sources:
                 x0, y0 = s.getX(), s.getY()
-                x, y = distorter.distort(afwGeom.PointD(x0, y0), ccd)
                 ds9.dot("+", x0, y0, size=3, frame=frame, ctype=ds9.GREEN)
-                ds9.dot("o", x,  y,  frame=frame, ctype=ds9.GREEN)
-                ds9.line([(x0, y0), (x, y)], frame=frame, ctype=ds9.GREEN)
+                if correctDistortion:
+                    x, y = distorter.distort(afwGeom.PointD(x0, y0), ccd)
+                    ds9.dot("o", x,  y,  frame=frame, ctype=ds9.GREEN)
+                    ds9.line([(x0, y0), (x, y)], frame=frame, ctype=ds9.GREEN)
 
             for s in catalog:
                 pix = wcs.skyToPixel(s.getCoord())
@@ -118,7 +122,6 @@ class TaburAstrometry(measAst.Astrometry):
             allFluxes = (True if Colorterm.getColorterm(filterName) else False)
             )
         if self.log: self.log.log(self.log.INFO, "Found %d catalog sources" % len(cat))
-
         allSources = sources
         sources = afwTable.SourceCatalog(sources.table)
         sources.extend(s for s in allSources if goodStar(s))
@@ -130,7 +133,8 @@ class TaburAstrometry(measAst.Astrometry):
         minNumMatchedPair = min(self.config.minMatchedPairNumber,
                                 int(self.config.minMatchedPairFrac * len(cat)))
 
-        show(debug, exposure, wcs, sources, cat,
+        correctDistortion=not wcs.hasDistortion()
+        show(debug, exposure, wcs, sources, cat, correctDistortion=correctDistortion,
              frame=debug.frame1 if isinstance(debug.frame1, int) else 1, title="Input catalog")
 
         try:
@@ -173,7 +177,7 @@ class TaburAstrometry(measAst.Astrometry):
             astrom.matches.push_back(m)
 
         if self.config.calculateSip:
-            show(debug, exposure, wcs, sources, cat, matches=matchList,
+            show(debug, exposure, wcs, sources, cat, matches=matchList, correctDistortion=correctDistortion,
                  frame=debug.frame3 if isinstance(debug.frame3, int) else 3, title="SIP matches")
 
         return astrom
