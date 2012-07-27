@@ -2,6 +2,7 @@
 
 import numpy
 import lsst.daf.base as dafBase
+import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.meas.algorithms as measAlg
 import lsst.meas.astrom as measAst
@@ -64,30 +65,29 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], frame=1, title=""):
     with ds9.Buffering():
         if matches:
             for s in sources:
-                x, y = distorter.toObserved(s.getX(), s.getY())
+                x, y = distorter.distort(s.getCentroid(), ccd)
                 ds9.dot("+", x,  y,  frame=frame, ctype=ds9.GREEN)
 
             for s in catalog:
-                x, y = wcs.skyToPixel(s.getCoord())
-                x, y = distorter.toObserved(x, y)
+                x, y = distorter.distort(wcs.skyToPixel(s.getCoord()), ccd)
                 ds9.dot("x", x, y, size=3, frame=frame, ctype=ds9.RED)
 
             dr = numpy.ndarray(len(matches))
 
             for i, m in enumerate(matches):
-                x, y = m.second.getX(), m.second.getY()
+                xy = m.second.getCentroid()
                 pix = wcs.skyToPixel(m.first.getCoord())
 
-                dr[i] = numpy.hypot(pix[0] - x, pix[1] - y)
+                dr[i] = numpy.hypot(pix[0] - xy[0], pix[1] - xy[1])
 
-                x, y = distorter.toObserved(x, y)
+                x, y = distorter.distort(xy, ccd)
                 ds9.dot("o", x,  y, size=4, frame=frame, ctype=ds9.YELLOW)
                 
             print "<dr> = %.4g +- %.4g [%d matches]" % (dr.mean(), dr.std(), len(matches))
         else:
             for s in sources:
                 x0, y0 = s.getX(), s.getY()
-                x, y = distorter.toObserved(x0, y0)
+                x, y = distorter.distort(afwGeom.PointD(x0, y0), ccd)
                 ds9.dot("+", x0, y0, size=3, frame=frame, ctype=ds9.GREEN)
                 ds9.dot("o", x,  y,  frame=frame, ctype=ds9.GREEN)
                 ds9.line([(x0, y0), (x, y)], frame=frame, ctype=ds9.GREEN)
