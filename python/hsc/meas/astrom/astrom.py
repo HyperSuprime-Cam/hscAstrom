@@ -24,6 +24,11 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
         doc="Minimum number of matched pairs, expressed as a fraction of the reference catalogue size",
         dtype=float,
         default=0.2, min=0, max=1)
+    minUnsaturatedMatches = RangeField(
+        doc="Minimum number of unsaturated matches before we include saturated stars",
+        dtype=int,
+        default=10, min=0,
+        )
     pixelMargin = RangeField(
         doc="Padding to add to image size (pixels)",
         dtype=int,
@@ -48,7 +53,8 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
 
 def goodStar(s):
     # FIXME: should use Key to get flag (but then we'd need schema in advance)
-    return numpy.isfinite(s.getX()) and numpy.isfinite(s.getY()) and not s.get("flags.pixel.saturated.any")
+    return numpy.isfinite(s.getX()) and numpy.isfinite(s.getY()) and \
+        not numpy.logical_or(s.get("initial.flags.pixel.saturated.any"), s.get("flags.pixel.saturated.any"))
 
 def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=True, frame=1, title=""):
     import lsst.afw.display.ds9 as ds9
@@ -72,7 +78,7 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=T
                 if distorter:
                     xy = distorter.distort(xy, ccd)
 
-                ds9.dot("+", *xy,  frame=frame, ctype=ds9.GREEN)
+                ds9.dot("+", *xy,  frame=frame, ctype=ds9.YELLOW)
 
             for s in catalog:
                 xy = wcs.skyToPixel(s.getCoord())
@@ -90,17 +96,17 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=T
 
                 if distorter:
                     xy = distorter.distort(xy, ccd)
-                ds9.dot("o", *xy, size=4, frame=frame, ctype=ds9.YELLOW)
+                ds9.dot("o", *xy, size=4, frame=frame, ctype=ds9.MAGENTA)
                 
             print "<dr> = %.4g +- %.4g [%d matches]" % (dr.mean(), dr.std(), len(matches))
         else:
             for s in sources:
                 x0, y0 = s.getX(), s.getY()
-                ds9.dot("+", x0, y0, size=3, frame=frame, ctype=ds9.GREEN)
+                ds9.dot("+", x0, y0, size=3, frame=frame, ctype=ds9.YELLOW)
                 if correctDistortion:
                     x, y = distorter.distort(afwGeom.PointD(x0, y0), ccd)
-                    ds9.dot("o", x,  y,  frame=frame, ctype=ds9.GREEN)
-                    ds9.line([(x0, y0), (x, y)], frame=frame, ctype=ds9.GREEN)
+                    ds9.dot("o", x,  y,  frame=frame, ctype=ds9.YELLOW)
+                    ds9.line([(x0, y0), (x, y)], frame=frame, ctype=ds9.YELLOW)
 
             for s in catalog:
                 pix = wcs.skyToPixel(s.getCoord())
@@ -146,10 +152,14 @@ class TaburAstrometry(measAst.Astrometry):
         try:
             matchList = hscAstrom.match(cat, sources, wcs, self.config.numBrightStars, minNumMatchedPair,
                                         self.config.matchingRadius)
-            if matchList is None or len(matchList) == 0:
+            nMatch = len(matchList) if matchList else 0
+            if nMatch == 0:
                 raise RuntimeError("Unable to match sources")
-        except:
-            if self.log: self.log.info("Matching failed; retrying with saturated sources.")
+            if nMatch < self.config.minUnsaturatedMatches:
+                raise RuntimeError("Too few unsaturated sources (%d < %d)" %
+                                   (nMatch, self.config.minUnsaturatedMatches))
+        except Exception, e:
+            if self.log: self.log.info("Matching failed (%s); retrying with saturated sources" % e)
             matchList = hscAstrom.match(cat, allSources, wcs, self.config.numBrightStars, minNumMatchedPair,
                                         self.config.matchingRadius)
             if matchList is None or len(matchList) == 0:
