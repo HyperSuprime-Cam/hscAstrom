@@ -157,7 +157,7 @@ class TaburAstrometry(measAst.Astrometry):
         astrom.solveQa = dafBase.PropertyList()
 
         if self.config.calculateSip:
-            wcs, matchList = self._calculateSipTerms(wcs, cat, sources, matchList)
+            wcs, matchList = self._calculateSipTerms(wcs, cat, sources, matchList, imageSize)
             astrom.sipWcs = wcs
             astrom.sipMatches = matchList
 
