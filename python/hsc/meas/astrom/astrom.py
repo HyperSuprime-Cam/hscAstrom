@@ -2,6 +2,7 @@
 
 import numpy
 import lsst.daf.base as dafBase
+import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.meas.algorithms as measAlg
 import lsst.meas.astrom as measAst
@@ -56,20 +57,29 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=T
 
     ds9.mtv(exposure, frame=frame, title=title)
 
-#    if correctDistortion:
-#        distorter = pipeDist.RadialPolyDistorter(exposure.getDetector())
-#    else:
-#        distorter = pipeDist.NullDistorter(None, exposure.getDetector()) # We already corrected for distortion
+    distorter = None
+    if correctDistortion:
+        try:
+            detector = exposure.getDetector()
+            distorter = detector.getDistortion()
+            def toObserved(x, y):
+                dist = distorter.distort(afwGeom.Point2D(x, y), detector)
+                return dist.getX(), dist.getY()
+        except Exception, e:
+            print "WARNING: Unable to use distortion: %s" % e
+            distorter = None
+    if distorter is None:
+        toObserved = lambda x,y: (x,y)
 
     with ds9.Buffering():
         if matches:
             for s in sources:
-                x, y = distorter.toObserved(s.getX(), s.getY())
+                x, y = toObserved(s.getX(), s.getY())
                 ds9.dot("+", x,  y,  frame=frame, ctype=ds9.GREEN)
 
             for s in catalog:
                 x, y = wcs.skyToPixel(s.getCoord())
-                x, y = distorter.toObserved(x, y)
+                x, y = toObserved(x, y)
                 ds9.dot("x", x, y, size=3, frame=frame, ctype=ds9.RED)
 
             dr = numpy.ndarray(len(matches))
@@ -80,7 +90,7 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=T
 
                 dr[i] = numpy.hypot(pix[0] - x, pix[1] - y)
 
-                x, y = distorter.toObserved(x, y)
+                x, y = toObserved(x, y)
                 ds9.dot("o", x,  y, size=4, frame=frame, ctype=ds9.YELLOW)
                 
             print "<dr> = %.4g +- %.4g [%d matches]" % (dr.mean(), dr.std(), len(matches))
@@ -89,7 +99,7 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=T
                 x0, y0 = s.getX(), s.getY()
                 ds9.dot("+", x0, y0, size=3, frame=frame, ctype=ds9.GREEN)
                 if correctDistortion:
-                    x, y = distorter.toObserved(x0, y0)
+                    x, y = toObserved(x0, y0)
                     ds9.dot("o", x,  y,  frame=frame, ctype=ds9.GREEN)
                     ds9.line([(x0, y0), (x, y)], frame=frame, ctype=ds9.GREEN)
 
