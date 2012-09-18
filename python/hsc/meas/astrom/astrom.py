@@ -26,10 +26,6 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
         doc="Padding to add to image size (pixels)",
         dtype=int,
         default=50, min=0)
-    matchingRadius = RangeField(
-        doc="Radius within which to accept matches (pixels)",
-        dtype=float,
-        default=10.0, min=0.0)
     calculateSip = Field(
         doc='''Compute polynomial SIP distortion terms?''',
         dtype=bool,
@@ -140,15 +136,17 @@ class TaburAstrometry(measAst.Astrometry):
         show(debug, exposure, wcs, sources, cat, correctDistortion=correctDistortion,
              frame=debug.frame1 if isinstance(debug.frame1, int) else 1, title="Input catalog")
 
+        matchingRadius = self.config.catalogMatchDist / wcs.pixelScale().asArcseconds() # in pixels
+
         try:
             matchList = hscAstrom.match(cat, sources, wcs, self.config.numBrightStars, minNumMatchedPair,
-                                        self.config.matchingRadius)
+                                        matchingRadius)
             if matchList is None or len(matchList) == 0:
                 raise RuntimeError("Unable to match sources")
         except:
             if self.log: self.log.info("Matching failed; retrying with saturated sources.")
             matchList = hscAstrom.match(cat, allSources, wcs, self.config.numBrightStars, minNumMatchedPair,
-                                        self.config.matchingRadius)
+                                        matchingRadius)
             if matchList is None or len(matchList) == 0:
                 raise RuntimeError("Unable to match sources")
         
