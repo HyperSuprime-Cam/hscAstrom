@@ -72,6 +72,7 @@ namespace hsc {
         int numBrightStars = 100,
         unsigned int minNumMatchedPair = 50,
         double matchingAllowanceInPixel = 10.,
+        int catOffset=0,
         double offsetAllowedInPixel = 300.,
         bool verbose = false
     );

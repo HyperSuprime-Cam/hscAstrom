@@ -367,6 +367,7 @@ hsc::meas::astrom::match(
     int numBrightStars,
     unsigned int minNumMatchedPair,
     double matchingAllowanceInPixel,
+    int catOffset,
     double offsetAllowedInPixel,
     bool verbose
 ) {
@@ -376,7 +377,7 @@ hsc::meas::astrom::match(
     ProxyVector proxyCat = makeProxies(cat, wcs);
     ProxyVector proxySrc = makeProxies(src);
     ProxyVector srcSub = selectPoint(proxySrc, src.getTable()->getPsfFluxKey(), Nsub);
-    ProxyVector catSub = selectPoint(proxyCat, cat.getSchema().find<double>("flux").key, srcSub.size()+25);
+    ProxyVector catSub = selectPoint(proxyCat, cat.getSchema().find<double>("flux").key, srcSub.size()+25, catOffset);
     //std::cout << srcSub.size() << " " << catSub.size() << std::endl;
 
     unsigned int catSize = catSub.size();
@@ -418,86 +419,97 @@ hsc::meas::astrom::match(
     for (size_t ii = 0; ii < srcPair.size(); ii++) {
 	ProxyPair p = srcPair[ii];
 
-	    std::vector<ProxyPair> q = searchPair(catPair, p, e);
+	std::vector<ProxyPair> q = searchPair(catPair, p, e);
 
-	    // If candidate pairs are found
-	    if (q.size() != 0) {
+	// If candidate pairs are found
+	if (q.size() != 0) {
 
-		std::vector<ProxyPair> srcMatPair;
-		std::vector<ProxyPair> catMatPair;
+	    std::vector<ProxyPair> srcMatPair;
+	    std::vector<ProxyPair> catMatPair;
 
-		// Go through candidate pairs
-		for (size_t l = 0; l < q.size(); l++) {
+	    // Go through candidate pairs
+	    for (size_t l = 0; l < q.size(); l++) {
 
-		    double dpa = p.pa - q[l].pa;
+		double dpa = p.pa - q[l].pa;
 
-		    srcMatPair.clear();
-		    catMatPair.clear();
+		srcMatPair.clear();
+		catMatPair.clear();
 
-		    srcMatPair.push_back(p);
-		    catMatPair.push_back(q[l]);
+		srcMatPair.push_back(p);
+		catMatPair.push_back(q[l]);
 
-		    //std::cout << "p dist: " << p.distance << " pa: " << p.pa << std::endl;
-		    //std::cout << "q dist: " << q[l].distance << " pa: " << q[l].pa << std::endl;
+		//std::cout << "p dist: " << p.distance << " pa: " << p.pa << std::endl;
+		//std::cout << "q dist: " << q[l].distance << " pa: " << q[l].pa << std::endl;
 
-		    for (size_t k = 0; k < srcSub.size(); k++) {
-                if (p.first == srcSub[k] || p.second == srcSub[k]) continue;
+		for (size_t k = 0; k < srcSub.size(); k++) {
+		    if (p.first == srcSub[k] || p.second == srcSub[k]) continue;
 
-                ProxyPair pp(p.first, srcSub[k]);
+		    ProxyPair pp(p.first, srcSub[k]);
                 
-                std::vector<ProxyPair>::iterator r = searchPair3(catPair, pp, q[l], e, dpa);
-                if (r != catPair.end()) {
-                    srcMatPair.push_back(pp);
-                    catMatPair.push_back(*r);
-                    //std::cout << "  p dist: " << pp.distance << " pa: " << pp.pa << std::endl;
-                    //std::cout << "  r dist: " << (*r).distance << " pa: " << (*r).pa << std::endl;
-                    if (srcMatPair.size() == m-1) {
-                        break;
-                    }
-                }
+		    std::vector<ProxyPair>::iterator r = searchPair3(catPair, pp, q[l], e, dpa);
+		    if (r != catPair.end()) {
+			srcMatPair.push_back(pp);
+			catMatPair.push_back(*r);
+			//std::cout << "  p dist: " << pp.distance << " pa: " << pp.pa << std::endl;
+			//std::cout << "  r dist: " << (*r).distance << " pa: " << (*r).pa << std::endl;
+			if (srcMatPair.size() == m-1) {
+			    break;
+			}
+		    }
+		}
+
+		bool goodMatch = false;
+		if (srcMatPair.size() == m - 1) {
+		    goodMatch = true;
+		    for (size_t k = 1; k < catMatPair.size(); k++) {
+			if (catMatPair[0].first != catMatPair[k].first) {
+			    goodMatch = false;
+			}
+		    }
+		}
+
+		if (goodMatch && srcMatPair.size() == m-1) {
+
+		    ProxyVector srcMat;
+		    ProxyVector catMat;
+
+		    srcMat.push_back(srcMatPair[0].first);
+		    catMat.push_back(catMatPair[0].first);
+		    for (size_t k = 0; k < srcMatPair.size(); k++) {
+			srcMat.push_back(srcMatPair[k].second);
+			catMat.push_back(catMatPair[k].second);
 		    }
 
-		    bool goodMatch = false;
-		    if (srcMatPair.size() == m - 1) {
-                goodMatch = true;
-                for (size_t k = 1; k < catMatPair.size(); k++) {
-                    if (catMatPair[0].first != catMatPair[k].first) {
-                        goodMatch = false;
-                    }
-                }
+		    boost::shared_array<double> coeff = polyfit(1, srcMat, catMat);
+
+		    if (verbose) {
+			std::cout << coeff[0] << " " << coeff[1] << " " << coeff[2] << std::endl;
+			std::cout << coeff[3] << " " << coeff[4] << " " << coeff[5] << std::endl;
+			std::cout << coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1. << std::endl;
 		    }
-
-		    if (goodMatch && srcMatPair.size() == m-1) {
-
-                ProxyVector srcMat;
-                ProxyVector catMat;
-
-                srcMat.push_back(srcMatPair[0].first);
-                catMat.push_back(catMatPair[0].first);
-                for (size_t k = 0; k < srcMatPair.size(); k++) {
-                    srcMat.push_back(srcMatPair[k].second);
-                    catMat.push_back(catMatPair[k].second);
-                }
-
-                boost::shared_array<double> coeff = polyfit(1, srcMat, catMat);
-
-                if (fabs(coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1.) > 0.008 ||
-                    fabs(coeff[0]) > offsetAllowedInPixel || fabs(coeff[3]) > offsetAllowedInPixel) {
-                    continue;
-                } else {
-                    matPair = FinalVerify(coeff, proxyCat, proxySrc, matchingAllowanceInPixel, verbose);
-                    //std::cout << matPair.size() << std::endl;
-                    if (matPair.size() <= minNumMatchedPair) {
-                        continue;
-                    } else {
-                        //std::cout << "Finish" << std::endl;
-                        return matPair;
-                    }
-                }
+		    if (fabs(coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1.) > 0.008 ||
+			fabs(coeff[0]) > offsetAllowedInPixel || fabs(coeff[3]) > offsetAllowedInPixel) {
+			if (verbose)
+			    std::cout << std::endl;
+			continue;
+		    } else {
+			matPair = FinalVerify(coeff, proxyCat, proxySrc, matchingAllowanceInPixel, verbose);
+			if (verbose)
+			    std::cout << minNumMatchedPair << " " << matPair.size() << std::endl;
+			if (matPair.size() <= minNumMatchedPair) {
+			    if (verbose)
+				std::cout << std::endl;
+			    continue;
+			} else {
+			    if (verbose)
+				std::cout << "Finish" << std::endl;
+			    return matPair;
+			}
+		    }
                 
-		    } // if
-		} // for l
-	    }	// if
-    }	// for ii
+		} // if
+	    } // for l
+	} // if
+    } // for ii
     return matPair;
 }

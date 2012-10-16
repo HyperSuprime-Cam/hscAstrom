@@ -140,7 +140,8 @@ class TaburAstrometry(measAst.Astrometry):
 
         try:
             matchList = hscAstrom.match(cat, sources, wcs, self.config.numBrightStars, minNumMatchedPair,
-                                        matchingRadius)
+                                        matchingRadius,
+                                        len(allSources)-len(sources))
             if matchList is None or len(matchList) == 0:
                 raise RuntimeError("Unable to match sources")
         except:
