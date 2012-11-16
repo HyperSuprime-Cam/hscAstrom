@@ -378,7 +378,8 @@ hsc::meas::astrom::match(
     ProxyVector proxySrc = makeProxies(src);
     ProxyVector srcSub = selectPoint(proxySrc, src.getTable()->getPsfFluxKey(), Nsub);
     ProxyVector catSub = selectPoint(proxyCat, cat.getSchema().find<double>("flux").key, srcSub.size()+25, catOffset);
-    //std::cout << srcSub.size() << " " << catSub.size() << std::endl;
+    if (verbose)
+	std::cout << srcSub.size() << " " << catSub.size() << std::endl;
 
     unsigned int catSize = catSub.size();
     unsigned int srcSize = srcSub.size();
@@ -438,8 +439,10 @@ hsc::meas::astrom::match(
 		srcMatPair.push_back(p);
 		catMatPair.push_back(q[l]);
 
-		//std::cout << "p dist: " << p.distance << " pa: " << p.pa << std::endl;
-		//std::cout << "q dist: " << q[l].distance << " pa: " << q[l].pa << std::endl;
+		if (verbose) {
+		    std::cout << "p dist: " << p.distance << " pa: " << p.pa << std::endl;
+		    std::cout << "q dist: " << q[l].distance << " pa: " << q[l].pa << std::endl;
+		}
 
 		for (size_t k = 0; k < srcSub.size(); k++) {
 		    if (p.first == srcSub[k] || p.second == srcSub[k]) continue;
@@ -450,8 +453,10 @@ hsc::meas::astrom::match(
 		    if (r != catPair.end()) {
 			srcMatPair.push_back(pp);
 			catMatPair.push_back(*r);
-			//std::cout << "  p dist: " << pp.distance << " pa: " << pp.pa << std::endl;
-			//std::cout << "  r dist: " << (*r).distance << " pa: " << (*r).pa << std::endl;
+			if (verbose) {
+			    std::cout << "  p dist: " << pp.distance << " pa: " << pp.pa << std::endl;
+			    std::cout << "  r dist: " << (*r).distance << " pa: " << (*r).pa << std::endl;
+			}
 			if (srcMatPair.size() == m-1) {
 			    break;
 			}

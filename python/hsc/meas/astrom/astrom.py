@@ -39,6 +39,10 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
     useWcsRaDecCenter = True
     useWcsParity = True
 
+def cleanStar(s):
+    return (numpy.isfinite(s.getX()) and
+            numpy.isfinite(s.getY()) and
+            not s.get("initial.flags.pixel.bad"))
 
 def goodStar(s):
     # FIXME: should use Key to get flag (but then we'd need schema in advance)
@@ -121,7 +125,9 @@ class TaburAstrometry(measAst.Astrometry):
         imageSize = (exposure.getWidth(), exposure.getHeight())
         cat = self.getReferenceSourcesForWcs(wcs, imageSize, filterName, self.config.pixelMargin)
         if self.log: self.log.log(self.log.INFO, "Found %d catalog sources" % len(cat))
-        allSources = sources
+        #allSources = sources
+        allSources = afwTable.SourceCatalog(sources.table)
+        allSources.extend(s for s in sources if cleanStar(s))
         sources = afwTable.SourceCatalog(sources.table)
         sources.extend(s for s in allSources if goodStar(s))
         
