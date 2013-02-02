@@ -34,6 +34,10 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
         doc='''Polynomial order of SIP distortion terms''',
         dtype=int,
         default=4, min=1)
+    offsetAllowedInPixel = RangeField(
+        doc="Offset between sources and catalog allowed (pixel)",
+        dtype=int,
+        default=300, max=4000)
     # Set these for proper operation of overridden astrometry class
     useWcsPixelScale = True
     useWcsRaDecCenter = True
@@ -124,6 +128,17 @@ class TaburAstrometry(measAst.Astrometry):
         filterName = exposure.getFilter().getName()
         imageSize = (exposure.getWidth(), exposure.getHeight())
         cat = self.getReferenceSourcesForWcs(wcs, imageSize, filterName, self.config.pixelMargin)
+        # Select unique objects only
+        keep = type(cat)(cat.table)
+        for c in cat:
+            found = False
+            for k in keep:
+                if c.getCoord() == k.getCoord():
+                    found = True
+                    break
+            if not found:
+                keep.append(c)
+        cat = keep
         if self.log: self.log.log(self.log.INFO, "Found %d catalog sources" % len(cat))
         #allSources = sources
         allSources = afwTable.SourceCatalog(sources.table)
@@ -147,13 +162,15 @@ class TaburAstrometry(measAst.Astrometry):
         try:
             matchList = hscAstrom.match(cat, sources, wcs, self.config.numBrightStars, minNumMatchedPair,
                                         matchingRadius,
-                                        len(allSources)-len(sources))
+                                        len(allSources)-len(sources),
+                                        self.config.offsetAllowedInPixel)
             if matchList is None or len(matchList) == 0:
                 raise RuntimeError("Unable to match sources")
         except:
             if self.log: self.log.info("Matching failed; retrying with saturated sources.")
             matchList = hscAstrom.match(cat, allSources, wcs, self.config.numBrightStars, minNumMatchedPair,
-                                        matchingRadius)
+                                        matchingRadius, 0,
+                                        self.config.offsetAllowedInPixel)
             if matchList is None or len(matchList) == 0:
                 raise RuntimeError("Unable to match sources")
         

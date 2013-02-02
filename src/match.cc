@@ -387,7 +387,7 @@ hsc::meas::astrom::match(
     /*
     std::ofstream of("zzz");
     for (unsigned int i = 0; i < srcSub.size(); i++) {
-	of << srcSub[i].getX() << " " << srcSub[i].getY()<< " " << srcSub[i].getPsfFlux() << " " << catSub[i].getX() << " " << catSub[i].getY() << " " << catSub[i].getPsfFlux()<< std::endl;
+	of << srcSub[i].getX() << " " << srcSub[i].getY()<< " " << catSub[i].getX() << " " << catSub[i].getY() << std::endl;
     }
     of.close();
     */
