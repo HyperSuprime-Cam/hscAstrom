@@ -74,6 +74,7 @@ namespace hsc {
         double matchingAllowanceInPixel = 10.,
         int catOffset=0,
         double offsetAllowedInPixel = 300.,
+        double rotationAllowdedInRad = 0.02,
         bool verbose = false
     );
 

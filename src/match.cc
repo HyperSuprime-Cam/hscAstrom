@@ -72,13 +72,13 @@ ProxyVector selectPoint(
     return ProxyVector(b.begin() + start, b.begin() + end);
 }
 
-std::vector<ProxyPair> searchPair(std::vector<ProxyPair> &a, ProxyPair &p, double e) {
+std::vector<ProxyPair> searchPair(std::vector<ProxyPair> &a, ProxyPair &p, double &e, double &e_dpa) {
     std::vector<ProxyPair> v;
 
     for (size_t i = 0; i < a.size(); i++) {
 	double dd = fabs(a[i].distance - p.distance);
 	double dpa = fabs(a[i].pa - p.pa);
-	if (dd < e && dpa < 0.03) {
+	if (dd < e && dpa < e_dpa) {
 //	if (dd < e) {
 	    a[i].deltaD = dd;
 	    v.push_back(a[i]);
@@ -93,7 +93,7 @@ std::vector<ProxyPair>::iterator searchPair3(std::vector<ProxyPair> &a,
                                              const ProxyPair &q,
                                              const double &e,
                                              const double &dpa,
-                                             const double &e_dpa = 0.03) {
+                                             const double &e_dpa = 0.02) {
     std::vector<ProxyPair>::iterator idx = a.end();
     double dd_min = 1.E+10;
     //double dpa_min = e_dpa;
@@ -102,7 +102,8 @@ std::vector<ProxyPair>::iterator searchPair3(std::vector<ProxyPair> &a,
 	double dd = fabs(i->distance - p.distance);
 #if 1
 	if (dd < e &&
-	    fabs(p.pa - i->pa - dpa) < e_dpa &&
+	    //fabs(p.pa - i->pa - dpa) < e_dpa &&
+	    fabs(p.pa - i->pa) < e_dpa &&
 	    dd < dd_min &&
 	    (i->first == q.first)) {
 	    dd_min = dd;
@@ -369,6 +370,7 @@ hsc::meas::astrom::match(
     double matchingAllowanceInPixel,
     int catOffset,
     double offsetAllowedInPixel,
+    double rotationAllowedInRad,
     bool verbose
 ) {
     // Select brightest Nsub stars from list of objects
@@ -383,7 +385,12 @@ hsc::meas::astrom::match(
 
     unsigned int catSize = catSub.size();
     unsigned int srcSize = srcSub.size();
-    
+/*    
+    CompareProxyFlux cmp = {cat.getSchema().find<double>("flux").key};
+    std::sort(proxyCat.begin(), proxyCat.end(), cmp);
+    cmp = {src.getTable()->getPsfFluxKey()};
+    std::sort(proxySrc.begin(), proxySrc.end(), cmp);
+*/
     /*
     std::ofstream of("zzz");
     for (unsigned int i = 0; i < srcSub.size(); i++) {
@@ -417,10 +424,11 @@ hsc::meas::astrom::match(
 
     size_t m = 5;		// Number of objects to define the shape
     double e = matchingAllowanceInPixel; // Error allowed for matching
+    double e_dpa = rotationAllowedInRad;
     for (size_t ii = 0; ii < srcPair.size(); ii++) {
 	ProxyPair p = srcPair[ii];
 
-	std::vector<ProxyPair> q = searchPair(catPair, p, e);
+	std::vector<ProxyPair> q = searchPair(catPair, p, e, e_dpa);
 
 	// If candidate pairs are found
 	if (q.size() != 0) {
@@ -449,7 +457,7 @@ hsc::meas::astrom::match(
 
 		    ProxyPair pp(p.first, srcSub[k]);
                 
-		    std::vector<ProxyPair>::iterator r = searchPair3(catPair, pp, q[l], e, dpa);
+		    std::vector<ProxyPair>::iterator r = searchPair3(catPair, pp, q[l], e, dpa, e_dpa);
 		    if (r != catPair.end()) {
 			srcMatPair.push_back(pp);
 			catMatPair.push_back(*r);
@@ -488,6 +496,15 @@ hsc::meas::astrom::match(
 		    boost::shared_array<double> coeff = polyfit(1, srcMat, catMat);
 
 		    if (verbose) {
+			for (size_t k = 0; k < srcMat.size(); k++) {
+			    std::cout << "circle(" << srcMat[k].getX() << "," << srcMat[k].getY() << ",10) # color=green" << std::endl;
+			    std::cout << "circle(" << catMat[k].getX() << "," << catMat[k].getY() << ",10) # color=red" << std::endl;
+			    std::cout << "line(" << srcMat[0].getX() << "," << srcMat[0].getY() << "," << srcMat[k].getX() << "," << srcMat[k].getY() << ") # line=0 0 color=green" << std::endl;
+			    std::cout << "line(" << catMat[0].getX() << "," << catMat[0].getY() << "," << catMat[k].getX() << "," << catMat[k].getY() << ") # line=0 0 color=red" << std::endl;
+			}
+		    }
+
+		    if (verbose) {
 			std::cout << coeff[0] << " " << coeff[1] << " " << coeff[2] << std::endl;
 			std::cout << coeff[3] << " " << coeff[4] << " " << coeff[5] << std::endl;
 			std::cout << coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1. << std::endl;
@@ -498,12 +515,39 @@ hsc::meas::astrom::match(
 			    std::cout << std::endl;
 			continue;
 		    } else {
+
+			double x0, y0, x1, y1;
+			int num = 0;
+			srcMat.clear();
+			catMat.clear();
+			for (size_t i = 0; i < srcSub.size(); i++) {
+			    x0 = srcSub[i].getX();
+			    y0 = srcSub[i].getY();
+			    transform(1, coeff, x0, y0, &x1, &y1);
+			    ProxyVector::const_iterator p = searchNearestPoint(catSub, x1, y1, e);
+			    if (p != catSub.end()) {
+				num++;
+				srcMat.push_back(srcSub[i]);
+				catMat.push_back(*p);
+			    }
+			}
+			coeff = polyfit(1, srcMat, catMat);
+
 			matPair = FinalVerify(coeff, proxyCat, proxySrc, matchingAllowanceInPixel, verbose);
+			/*
+			for (int k = 0; k < matPair.size(); k++) {
+			    double flux_cat = matPair[k].first->get(matPair[k].first->getSchema().find<double>("flux").key);
+			    double flux_src = matPair[k].second->get(matPair[k].second->getTable()->getPsfFluxKey());
+			    double delta_mag = 2.5 * log10(flux_src/flux_cat);
+			    std::cout << delta_mag  << std::endl;
+			}
+			*/
 			if (verbose)
 			    std::cout << minNumMatchedPair << " " << matPair.size() << std::endl;
 			if (matPair.size() <= minNumMatchedPair) {
 			    if (verbose)
 				std::cout << std::endl;
+			    matPair.clear();
 			    continue;
 			} else {
 			    if (verbose)

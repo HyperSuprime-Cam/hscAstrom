@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import numpy
+import math, numpy
 import lsst.daf.base as dafBase
 import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
@@ -38,6 +38,10 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
         doc="Offset between sources and catalog allowed (pixel)",
         dtype=int,
         default=300, max=4000)
+    rotationAllowedInRad = RangeField(
+        doc="Roation angle allowed between sources and catalog (radian)",
+        dtype=float,
+        default=0.02, max=0.1)
     # Set these for proper operation of overridden astrometry class
     useWcsPixelScale = True
     useWcsRaDecCenter = True
@@ -79,12 +83,12 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=T
         if matches:
             for s in sources:
                 x, y = toObserved(s.getX(), s.getY())
-                ds9.dot("+", x,  y,  frame=frame, ctype=ds9.GREEN)
+                ds9.dot("+", x,  y, size=10, frame=frame, ctype=ds9.GREEN)
 
             for s in catalog:
                 x, y = wcs.skyToPixel(s.getCoord())
                 x, y = toObserved(x, y)
-                ds9.dot("x", x, y, size=3, frame=frame, ctype=ds9.RED)
+                ds9.dot("x", x, y, size=10, frame=frame, ctype=ds9.RED)
 
             dr = numpy.ndarray(len(matches))
 
@@ -95,13 +99,13 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=T
                 dr[i] = numpy.hypot(pix[0] - x, pix[1] - y)
 
                 x, y = toObserved(x, y)
-                ds9.dot("o", x,  y, size=4, frame=frame, ctype=ds9.YELLOW)
+                ds9.dot("o", x,  y, size=10, frame=frame, ctype=ds9.YELLOW)
                 
             print "<dr> = %.4g +- %.4g [%d matches]" % (dr.mean(), dr.std(), len(matches))
         else:
             for s in sources:
                 x0, y0 = s.getX(), s.getY()
-                ds9.dot("+", x0, y0, size=3, frame=frame, ctype=ds9.GREEN)
+                ds9.dot("+", x0, y0, size=10, frame=frame, ctype=ds9.GREEN)
                 if correctDistortion:
                     x, y = toObserved(x0, y0)
                     ds9.dot("o", x,  y,  frame=frame, ctype=ds9.GREEN)
@@ -109,7 +113,42 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=T
 
             for s in catalog:
                 pix = wcs.skyToPixel(s.getCoord())
-                ds9.dot("x", pix[0], pix[1], size=3, frame=frame, ctype=ds9.RED)
+                ds9.dot("x", pix[0], pix[1], size=10, frame=frame, ctype=ds9.RED)
+
+def getUndistortedXY0(exposure):
+
+    correctDistortion=not exposure.getWcs().hasDistortion()
+    distorter = None
+    if correctDistortion:
+        try:
+            detector = exposure.getDetector()
+            distorter = detector.getDistortion()
+            def toUndistort(x, y):
+                dist = distorter.undistort(afwGeom.Point2D(x, y), detector)
+                return dist.getX(), dist.getY()
+        except Exception, e:
+            print "WARNING: Unable to use distortion: %s" % e
+            distorter = None
+    if distorter is None:
+        toUndistort = lambda x,y: (x,y)
+
+    x0, y0 = toUndistort(0,0)
+    x1 = x0
+    y1 = y0
+    for x, y in [(exposure.getWidth(), 0),
+                 (exposure.getWidth(),exposure.getHeight()),
+                 (0,exposure.getHeight())]:
+        xx, yy = toUndistort(x, y)
+        if xx < x0:
+            x0 = xx
+        if xx > x1:
+            x1 = xx
+        if yy < y0:
+            y0 = yy
+        if yy > y1:
+            y1 = yy
+    
+    return x0, y0, x1-x0, y1-y0
 
 class TaburAstrometry(measAst.Astrometry):
     """Star matching using algorithm based on V.Tabur 2007, PASA, 24, 189-198
@@ -125,9 +164,12 @@ class TaburAstrometry(measAst.Astrometry):
         wcs = exposure.getWcs() # Guess WCS
         if wcs is None:
             raise RuntimeError("This matching algorithm requires an input guess WCS")
+
+        x0, y0, w, h = getUndistortedXY0(exposure)
+
         filterName = exposure.getFilter().getName()
         imageSize = (exposure.getWidth(), exposure.getHeight())
-        cat = self.getReferenceSourcesForWcs(wcs, imageSize, filterName, self.config.pixelMargin)
+        cat = self.getReferenceSourcesForWcs(wcs, (w,h), filterName, self.config.pixelMargin, x0, y0)
         # Select unique objects only
         keep = type(cat)(cat.table)
         for c in cat:
@@ -160,17 +202,35 @@ class TaburAstrometry(measAst.Astrometry):
         matchingRadius = self.config.catalogMatchDist / wcs.pixelScale().asArcseconds() # in pixels
 
         try:
-            matchList = hscAstrom.match(cat, sources, wcs, self.config.numBrightStars, minNumMatchedPair,
-                                        matchingRadius,
-                                        len(allSources)-len(sources),
-                                        self.config.offsetAllowedInPixel)
+            for i in range(4):
+                e_dpa = self.config.rotationAllowedInRad * math.pow(2.0, 0.5*i)
+                for j in range(3):
+                    matchingRadius = self.config.catalogMatchDist / wcs.pixelScale().asArcseconds() * math.pow(1.25, j)
+                    matchList = hscAstrom.match(cat, sources, wcs, self.config.numBrightStars, minNumMatchedPair,
+                                                matchingRadius,
+                                                len(allSources)-len(sources),
+                                                self.config.offsetAllowedInPixel,
+                                                e_dpa)
+                    if matchList is not None and len(matchList) != 0:
+                        break
+                if matchList is not None and len(matchList) != 0:
+                    break
             if matchList is None or len(matchList) == 0:
                 raise RuntimeError("Unable to match sources")
         except:
             if self.log: self.log.info("Matching failed; retrying with saturated sources.")
-            matchList = hscAstrom.match(cat, allSources, wcs, self.config.numBrightStars, minNumMatchedPair,
-                                        matchingRadius, 0,
-                                        self.config.offsetAllowedInPixel)
+            for i in range(4):
+                e_dpa = self.config.rotationAllowedInRad * math.pow(2.0, 0.5*i)
+                for j in range(3):
+                    matchingRadius = self.config.catalogMatchDist / wcs.pixelScale().asArcseconds() * math.pow(1.25, j)
+                    matchList = hscAstrom.match(cat, allSources, wcs, self.config.numBrightStars, minNumMatchedPair,
+                                                matchingRadius, 0,
+                                                self.config.offsetAllowedInPixel,
+                                                e_dpa)
+                    if matchList is not None and len(matchList) != 0:
+                        break
+                if matchList is not None and len(matchList) != 0:
+                    break
             if matchList is None or len(matchList) == 0:
                 raise RuntimeError("Unable to match sources")
         
@@ -206,4 +266,3 @@ class TaburAstrometry(measAst.Astrometry):
                  frame=debug.frame3 if isinstance(debug.frame3, int) else 3, title="SIP matches")
 
         return astrom
-
