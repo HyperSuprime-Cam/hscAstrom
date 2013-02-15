@@ -47,10 +47,22 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
     useWcsRaDecCenter = True
     useWcsParity = True
 
-def cleanStar(s):
-    return (numpy.isfinite(s.getX()) and
-            numpy.isfinite(s.getY()) and
-            not s.get("initial.flags.pixel.bad"))
+def cleanStar(s, ccdId):
+    clean = (numpy.isfinite(s.getX()) and
+             numpy.isfinite(s.getY()) and
+             not s.get("initial.flags.pixel.bad"))
+
+    # Mask edge region for HSC
+    if ccdId == 100:
+        clean = clean and (s.getY() < -1450./2000. * (s.getX() - 2000.) + 2000.)
+    elif ccdId == 101:
+        clean = clean and (s.getY() >  1300./1700. * (s.getX() - 2400.) +    0.)
+    elif ccdId == 102:
+        clean = clean and (s.getY() > -1300./1800. * (s.getX() -    0.) + 1300.)
+    elif ccdId == 103:
+        clean = clean and (s.getY() <  1600./2200. * (s.getX() -    0.) +  400.)
+
+    return clean
 
 def goodStar(s):
     # FIXME: should use Key to get flag (but then we'd need schema in advance)
@@ -184,7 +196,7 @@ class TaburAstrometry(measAst.Astrometry):
         if self.log: self.log.log(self.log.INFO, "Found %d catalog sources" % len(cat))
         #allSources = sources
         allSources = afwTable.SourceCatalog(sources.table)
-        allSources.extend(s for s in sources if cleanStar(s))
+        allSources.extend(s for s in sources if cleanStar(s, exposure.getDetector().getId().getSerial()))
         sources = afwTable.SourceCatalog(sources.table)
         sources.extend(s for s in allSources if goodStar(s))
         
@@ -193,7 +205,7 @@ class TaburAstrometry(measAst.Astrometry):
 
         numBrightStars = max(self.config.numBrightStars, len(sources))
         minNumMatchedPair = min(self.config.minMatchedPairNumber,
-                                int(self.config.minMatchedPairFrac * len(cat)))
+                                int(self.config.minMatchedPairFrac * min([len(cat), len(sources)])))
 
         correctDistortion=not wcs.hasDistortion()
         show(debug, exposure, wcs, sources, cat, correctDistortion=correctDistortion,

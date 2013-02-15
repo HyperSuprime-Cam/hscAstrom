@@ -102,8 +102,7 @@ std::vector<ProxyPair>::iterator searchPair3(std::vector<ProxyPair> &a,
 	double dd = fabs(i->distance - p.distance);
 #if 1
 	if (dd < e &&
-	    //fabs(p.pa - i->pa - dpa) < e_dpa &&
-	    fabs(p.pa - i->pa) < e_dpa &&
+	    fabs(p.pa - i->pa - dpa) < e_dpa &&
 	    dd < dd_min &&
 	    (i->first == q.first)) {
 	    dd_min = dd;
@@ -509,7 +508,7 @@ hsc::meas::astrom::match(
 			std::cout << coeff[3] << " " << coeff[4] << " " << coeff[5] << std::endl;
 			std::cout << coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1. << std::endl;
 		    }
-		    if (fabs(coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1.) > 0.008 ||
+		    if (fabs(coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1.) > 0.012 ||
 			fabs(coeff[0]) > offsetAllowedInPixel || fabs(coeff[3]) > offsetAllowedInPixel) {
 			if (verbose)
 			    std::cout << std::endl;
