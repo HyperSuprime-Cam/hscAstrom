@@ -52,7 +52,7 @@ boost::shared_array<double> sipfit(
     boost::scoped_array<double> a_data(new double[ncoeff*ncoeff]);
     boost::scoped_array<double> b_data(new double[ncoeff]);
     boost::scoped_array<double> c_data(new double[ncoeff]);
-    Key< Covariance<Point<double> > > covKey = imgTable.getCentroidErrKey();
+    Key< Covariance<Point<float> > > covKey = imgTable.getCentroidErrKey();
     for (int i = 0; i < ncoeff; i++) {
 	for (int j = 0; j < ncoeff; j++) {
 	    a_data[i*ncoeff+j] = 0.0;
