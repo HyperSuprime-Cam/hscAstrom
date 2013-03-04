@@ -47,20 +47,36 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
     useWcsRaDecCenter = True
     useWcsParity = True
 
-def cleanStar(s, ccdId):
+def cleanStar(s, ccdId, exposure, correctDistortion):
     clean = (numpy.isfinite(s.getX()) and
              numpy.isfinite(s.getY()) and
              not s.get("initial.flags.pixel.bad"))
 
+    distorter = None
+    if correctDistortion:
+        try:
+            detector = exposure.getDetector()
+            distorter = detector.getDistortion()
+            def toObserved(x, y):
+                dist = distorter.distort(afwGeom.Point2D(x, y), detector)
+                return dist.getX(), dist.getY()
+        except Exception, e:
+            print "WARNING: Unable to use distortion: %s" % e
+            distorter = None
+    if distorter is None:
+        toObserved = lambda x,y: (x,y)
+
+    x, y = toObserved(s.getX(), s.getY())
+
     # Mask edge region for HSC
     if ccdId == 100:
-        clean = clean and (s.getY() < -1450./2000. * (s.getX() - 2000.) + 2000.)
+        clean = clean and (y >  1300./1700. * (x - 2400.) +    0.)
     elif ccdId == 101:
-        clean = clean and (s.getY() >  1300./1700. * (s.getX() - 2400.) +    0.)
+        clean = clean and (y < -1450./2000. * (x - 2000.) + 2000.)
     elif ccdId == 102:
-        clean = clean and (s.getY() > -1300./1800. * (s.getX() -    0.) + 1300.)
+        clean = clean and (y > -1300./1800. * (x -    0.) + 1300.)
     elif ccdId == 103:
-        clean = clean and (s.getY() <  1600./2200. * (s.getX() -    0.) +  400.)
+        clean = clean and (y <  1600./2200. * (x -    0.) +  400.)
 
     return clean
 
@@ -193,10 +209,20 @@ class TaburAstrometry(measAst.Astrometry):
             if not found:
                 keep.append(c)
         cat = keep
+
+        # Avoid M31 center
+        keep = type(cat)(cat.table)
+        import lsst.afw.coord as afwCoord
+        m31 = afwCoord.Coord(afwGeom.Point2D(10.681, 41.269))
+        for c in cat:
+            if c.getCoord().angularSeparation(m31).asArcminutes() > 2.2:
+                keep.append(c)
+        cat = keep
+
         if self.log: self.log.log(self.log.INFO, "Found %d catalog sources" % len(cat))
         #allSources = sources
         allSources = afwTable.SourceCatalog(sources.table)
-        allSources.extend(s for s in sources if cleanStar(s, exposure.getDetector().getId().getSerial()))
+        allSources.extend(s for s in sources if cleanStar(s, exposure.getDetector().getId().getSerial(), exposure, not wcs.hasDistortion()))
         sources = afwTable.SourceCatalog(sources.table)
         sources.extend(s for s in allSources if goodStar(s))
         
