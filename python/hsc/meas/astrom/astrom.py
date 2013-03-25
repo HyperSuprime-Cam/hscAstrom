@@ -66,17 +66,18 @@ def cleanStar(s, ccdId, exposure, correctDistortion):
     if distorter is None:
         toObserved = lambda x,y: (x,y)
 
-    x, y = toObserved(s.getX(), s.getY())
+    if clean: # to remove invalid positions (e.g., nan) for input to toObserve
+        x, y = toObserved(s.getX(), s.getY())
 
-    # Mask edge region for HSC
-    if ccdId == 100:
-        clean = clean and (y >  1300./1700. * (x - 2400.) +    0.)
-    elif ccdId == 101:
-        clean = clean and (y < -1450./2000. * (x - 2000.) + 2000.)
-    elif ccdId == 102:
-        clean = clean and (y > -1300./1800. * (x -    0.) + 1300.)
-    elif ccdId == 103:
-        clean = clean and (y <  1600./2200. * (x -    0.) +  400.)
+        # Mask edge region for HSC
+        if ccdId == 100:
+            clean = clean and (y >  1300./1700. * (x - 2400.) +    0.)
+        elif ccdId == 101:
+            clean = clean and (y < -1450./2000. * (x - 2000.) + 2000.)
+        elif ccdId == 102:
+            clean = clean and (y > -1300./1800. * (x -    0.) + 1300.)
+        elif ccdId == 103:
+            clean = clean and (y <  1600./2200. * (x -    0.) +  400.)
 
     return clean
 
