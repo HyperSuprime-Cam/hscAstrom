@@ -1,0 +1,7 @@
+.scon*
+python/hsc/meas/astrom/astromLib.py
+python/hsc/meas/astrom/astromLib_wrap.cc
+*.os
+*.pyc
+python/hsc/meas/astrom/version.py
+ups/hscAstrom.cfgc
