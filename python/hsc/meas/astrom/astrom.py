@@ -227,38 +227,30 @@ class TaburAstrometry(measAst.Astrometry):
 
         matchingRadius = self.config.catalogMatchDist / wcs.pixelScale().asArcseconds() # in pixels
 
-        try:
+        def doMatching(sources):
+            """Attempt matching sources"""
             for i in range(4):
                 e_dpa = self.config.rotationAllowedInRad * math.pow(2.0, 0.5*i)
                 for j in range(3):
-                    matchingRadius = self.config.catalogMatchDist / wcs.pixelScale().asArcseconds() * math.pow(1.25, j)
-                    matchList = hscAstrom.match(cat, sources, wcs, self.config.numBrightStars, minNumMatchedPair,
-                                                matchingRadius,
+                    matchingRadius = (self.config.catalogMatchDist/wcs.pixelScale().asArcseconds()*
+                                      math.pow(1.25, j))
+                    matchList = hscAstrom.match(cat, sources, wcs, self.config.numBrightStars,
+                                                minNumMatchedPair, matchingRadius,
                                                 len(allSources)-len(sources),
                                                 self.config.offsetAllowedInPixel,
-                                                e_dpa)
+                                                e_dpa, debug.verbose)
                     if matchList is not None and len(matchList) != 0:
-                        break
+                        return matchList
                 if matchList is not None and len(matchList) != 0:
-                    break
+                    return matchList
             if matchList is None or len(matchList) == 0:
                 raise RuntimeError("Unable to match sources")
+
+        try:
+            matchList = doMatching(sources)
         except:
             if self.log: self.log.info("Matching failed; retrying with saturated sources.")
-            for i in range(4):
-                e_dpa = self.config.rotationAllowedInRad * math.pow(2.0, 0.5*i)
-                for j in range(3):
-                    matchingRadius = self.config.catalogMatchDist / wcs.pixelScale().asArcseconds() * math.pow(1.25, j)
-                    matchList = hscAstrom.match(cat, allSources, wcs, self.config.numBrightStars, minNumMatchedPair,
-                                                matchingRadius, 0,
-                                                self.config.offsetAllowedInPixel,
-                                                e_dpa)
-                    if matchList is not None and len(matchList) != 0:
-                        break
-                if matchList is not None and len(matchList) != 0:
-                    break
-            if matchList is None or len(matchList) == 0:
-                raise RuntimeError("Unable to match sources")
+            matchList = doMatching(allSources)
         
         if self.log: self.log.log(self.log.INFO, "Matched %d sources" % len(matchList))
 
