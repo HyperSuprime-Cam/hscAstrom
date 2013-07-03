@@ -48,25 +48,9 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
     useWcsParity = True
 
 def cleanStar(s, ccdId, exposure, correctDistortion):
-    clean = (numpy.isfinite(s.getX()) and
-             numpy.isfinite(s.getY()) and
-             not s.get("initial.flags.pixel.bad"))
-
-    distorter = None
-    if correctDistortion:
-        try:
-            detector = exposure.getDetector()
-            distorter = detector.getDistortion()
-            def toObserved(x, y):
-                dist = distorter.distort(afwGeom.Point2D(x, y), detector)
-                return dist.getX(), dist.getY()
-        except Exception, e:
-            print "WARNING: Unable to use distortion: %s" % e
-            distorter = None
-    if distorter is None:
-        toObserved = lambda x,y: (x,y)
-
-    return clean
+    return (numpy.isfinite(s.getX()) and
+            numpy.isfinite(s.getY()) and
+            not s.getCentroidFlag())
 
 def goodStar(s):
     # FIXME: should use Key to get flag (but then we'd need schema in advance)
