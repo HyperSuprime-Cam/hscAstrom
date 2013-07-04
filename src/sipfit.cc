@@ -367,6 +367,9 @@ fitTAN(ReferenceMatchVector const &matPair,
         double eta_D = calEta_D(ra, dec, crval[0], crval[1]);
         double u = matPair[i].second->getX() - crpix[0];
         double v = matPair[i].second->getY() - crpix[1];
+        if (verbose) {
+            std::cout << u << "," << v << " --> " << xi << "," << eta << std::endl;
+        }
         int i0 = ncoeff * 2 * iexp;
         for (int k = 0; k < ncoeff; k++) {
             for (int l = 0; l < ncoeff; l++) {
@@ -402,6 +405,19 @@ fitTAN(ReferenceMatchVector const &matPair,
     gsl_vector_view b = gsl_vector_view_array(b_data.get(), ndim);
     
     boost::shared_ptr<gsl_vector> c(gsl_vector_alloc(ndim), gsl_vector_free);
+
+    if (verbose) {
+        for (int i = 0; i < ndim; ++i) {
+            for (int j = 0; j < ndim; ++j) {
+                std::cout << a_data[i*ndim+j] << " ";
+            }
+            std::cout << std::endl;
+        }
+        for (int i = 0; i < ndim; ++i) {
+            std::cout << b_data[i] << " ";
+        }
+        std::cout << std::endl;
+    }
 
     //int s;
     /*

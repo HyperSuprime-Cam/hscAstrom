@@ -380,7 +380,7 @@ hsc::meas::astrom::match(
     ProxyVector srcSub = selectPoint(proxySrc, src.getTable()->getPsfFluxKey(), Nsub);
     ProxyVector catSub = selectPoint(proxyCat, cat.getSchema().find<double>("flux").key, srcSub.size()+25, catOffset);
     if (verbose)
-	std::cout << srcSub.size() << " " << catSub.size() << std::endl;
+	std::cout << "Catalog sizes: " << srcSub.size() << " " << catSub.size() << std::endl;
 
     unsigned int catSize = catSub.size();
     unsigned int srcSize = srcSub.size();
@@ -504,6 +504,7 @@ hsc::meas::astrom::match(
 		    }
 
 		    if (verbose) {
+                        std::cout << "Linear fit from match:" << std::endl;
 			std::cout << coeff[0] << " " << coeff[1] << " " << coeff[2] << std::endl;
 			std::cout << coeff[3] << " " << coeff[4] << " " << coeff[5] << std::endl;
 			std::cout << coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1. << std::endl;
@@ -511,7 +512,7 @@ hsc::meas::astrom::match(
 		    if (fabs(coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1.) > 0.012 ||
 			fabs(coeff[0]) > offsetAllowedInPixel || fabs(coeff[3]) > offsetAllowedInPixel) {
 			if (verbose)
-			    std::cout << std::endl;
+			    std::cout << "Bad; continuing" << std::endl;
 			continue;
 		    } else {
 
@@ -528,9 +529,20 @@ hsc::meas::astrom::match(
 				num++;
 				srcMat.push_back(srcSub[i]);
 				catMat.push_back(*p);
+                                if (verbose) {
+                                    std::cout << "Match: " << x0 << "," << y0 << " --> " << x1 << "," << y1 <<
+                                        " <==> " << p->getX() << "," << p->getY() << std::endl;
+                                }
 			    }
 			}
 			coeff = polyfit(1, srcMat, catMat);
+                        if (verbose) {
+                            std::cout << "Coefficients from initial matching:" << std::endl;
+                            for (size_t i = 0; i < 6; ++i) {
+                                std::cout << coeff[i] << " ";
+                            }
+                            std::cout << std::endl;
+                        }
 
 			matPair = FinalVerify(coeff, proxyCat, proxySrc, matchingAllowanceInPixel, verbose);
 			/*
@@ -542,10 +554,11 @@ hsc::meas::astrom::match(
 			}
 			*/
 			if (verbose)
-			    std::cout << minNumMatchedPair << " " << matPair.size() << std::endl;
+			    std::cout << "Number of matches: " << matPair.size() << " vs " <<
+                                minNumMatchedPair << std::endl;
 			if (matPair.size() <= minNumMatchedPair) {
 			    if (verbose)
-				std::cout << std::endl;
+				std::cout << "Insufficient final matches; continuing" << std::endl;
 			    matPair.clear();
 			    continue;
 			} else {
