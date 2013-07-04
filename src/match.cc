@@ -535,6 +535,13 @@ hsc::meas::astrom::match(
                                 }
 			    }
 			}
+                        if (num <= 1) {
+                            // Can get matrix = 0,0,0,0; everything matches a single catalog object
+                            if (verbose) {
+                                std::cout << "Insufficient initial matches; continuing" << std::endl;
+                            }
+                            continue;
+                        }
 			coeff = polyfit(1, srcMat, catMat);
                         if (verbose) {
                             std::cout << "Coefficients from initial matching:" << std::endl;
