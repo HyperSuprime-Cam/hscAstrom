@@ -49,12 +49,13 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
 
 def cleanStar(s, ccdId, exposure, correctDistortion):
     return (numpy.isfinite(s.getX()) and
-            numpy.isfinite(s.getY()) and
-            not s.getCentroidFlag())
+            numpy.isfinite(s.getY()))
 
 def goodStar(s):
     # FIXME: should use Key to get flag (but then we'd need schema in advance)
-    return numpy.isfinite(s.getX()) and numpy.isfinite(s.getY()) and not s.get("flags.pixel.saturated.any")
+    return (numpy.isfinite(s.getX()) and numpy.isfinite(s.getY()) and
+            not s.getCentroidFlag() and
+            not s.get("flags.pixel.saturated.any"))
 
 def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=True, frame=1, title=""):
     import lsst.afw.display.ds9 as ds9
@@ -182,12 +183,14 @@ class TaburAstrometry(measAst.Astrometry):
                 keep.append(c)
         cat = keep
 
-        # Avoid M31 center
+        # Avoid M31/M32 center
         keep = type(cat)(cat.table)
         import lsst.afw.coord as afwCoord
         m31 = afwCoord.Coord(afwGeom.Point2D(10.681, 41.269))
+        m32 = afwCoord.Coord(afwGeom.Point2D(10.675, 40.864))
         for c in cat:
-            if c.getCoord().angularSeparation(m31).asArcminutes() > 2.2:
+            if (c.getCoord().angularSeparation(m31).asArcminutes() > 2.2 and
+                c.getCoord().angularSeparation(m32).asArcminutes() > 1.0):
                 keep.append(c)
         cat = keep
 
