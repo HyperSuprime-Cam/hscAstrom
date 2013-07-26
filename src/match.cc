@@ -64,7 +64,7 @@ ProxyVector makeVector(SimpleCatalog const & refs, lsst::afw::image::Wcs const &
 ProxyVector selectPoint(
     ProxyVector const &a, Key<double> const & key, std::size_t num, std::size_t start=0
 ) {
-    // copy and sort array of pointers on psfFlux
+    // copy and sort array of pointers on apFlux
     CompareProxyFlux cmp = {key};
     ProxyVector b(a);
     std::sort(b.begin(), b.end(), cmp);
@@ -377,7 +377,7 @@ hsc::meas::astrom::match(
     int Nsub = numBrightStars;
     ProxyVector proxyCat = makeProxies(cat, wcs);
     ProxyVector proxySrc = makeProxies(src);
-    ProxyVector srcSub = selectPoint(proxySrc, src.getTable()->getPsfFluxKey(), Nsub);
+    ProxyVector srcSub = selectPoint(proxySrc, src.getTable()->getApFluxKey(), Nsub);
     ProxyVector catSub = selectPoint(proxyCat, cat.getSchema().find<double>("flux").key, srcSub.size()+25, catOffset);
     if (verbose)
 	std::cout << "Catalog sizes: " << srcSub.size() << " " << catSub.size() << std::endl;
