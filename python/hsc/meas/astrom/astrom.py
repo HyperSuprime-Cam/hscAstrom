@@ -21,7 +21,7 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
     minMatchedPairFrac = RangeField(
         doc="Minimum number of matched pairs, expressed as a fraction of the reference catalogue size",
         dtype=float,
-        default=0.2, min=0, max=1)
+        default=0.3, min=0, max=1)
     pixelMargin = RangeField(
         doc="Padding to add to image size (pixels)",
         dtype=int,
@@ -42,6 +42,10 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
         doc="Roation angle allowed between sources and catalog (radian)",
         dtype=float,
         default=0.02, max=0.1)
+    angleDiffFrom90 = RangeField(
+        doc="Angle difference from 90 degree allowed (degree)",
+        dtype=float,
+        default=0.05, max=0.20)
     # Set these for proper operation of overridden astrometry class
     useWcsPixelScale = True
     useWcsRaDecCenter = True
@@ -106,7 +110,7 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=T
         else:
             for s in sources:
                 x0, y0 = s.getX(), s.getY()
-                ds9.dot("+", x0, y0, size=10, frame=frame, ctype=ds9.GREEN)
+                ds9.dot("+", x0, y0, size=20, frame=frame, ctype=ds9.GREEN)
                 if correctDistortion:
                     x, y = toObserved(x0, y0)
                     ds9.dot("o", x,  y,  frame=frame, ctype=ds9.GREEN)
@@ -114,7 +118,7 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=T
 
             for s in catalog:
                 pix = wcs.skyToPixel(s.getCoord())
-                ds9.dot("x", pix[0], pix[1], size=10, frame=frame, ctype=ds9.RED)
+                ds9.dot("x", pix[0], pix[1], size=20, frame=frame, ctype=ds9.RED)
 
 def getUndistortedXY0(exposure):
 
@@ -221,11 +225,14 @@ class TaburAstrometry(measAst.Astrometry):
                 for j in range(3):
                     matchingRadius = (self.config.catalogMatchDist/wcs.pixelScale().asArcseconds()*
                                       math.pow(1.25, j))
-                    matchList = hscAstrom.match(cat, sources, wcs, self.config.numBrightStars,
-                                                minNumMatchedPair, matchingRadius,
-                                                len(allSources)-len(sources),
-                                                self.config.offsetAllowedInPixel,
-                                                e_dpa, debug.verbose)
+                    for k in range(3):
+                        matchList = hscAstrom.match(cat, sources, wcs, self.config.numBrightStars,
+                                                    minNumMatchedPair, matchingRadius,
+                                                    len(allSources)-len(sources),
+                                                    self.config.offsetAllowedInPixel,
+                                                    e_dpa, self.config.angleDiffFrom90*(k+1), debug.verbose)
+                        if matchList is not None and len(matchList) != 0:
+                            return matchList
                     if matchList is not None and len(matchList) != 0:
                         return matchList
                 if matchList is not None and len(matchList) != 0:

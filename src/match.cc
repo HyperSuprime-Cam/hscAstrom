@@ -370,6 +370,7 @@ hsc::meas::astrom::match(
     int catOffset,
     double offsetAllowedInPixel,
     double rotationAllowedInRad,
+    double angleDiffFrom90,
     bool verbose
 ) {
     // Select brightest Nsub stars from list of objects
@@ -503,13 +504,20 @@ hsc::meas::astrom::match(
 			}
 		    }
 
+		    double a = coeff[1];
+		    double b = coeff[2];
+		    double c = coeff[4];
+		    double d = coeff[5];
+		    double theta = acos((a*b+c*d)/(sqrt(a*a+c*c)*sqrt(b*b+d*d))) / M_PI * 180.;
 		    if (verbose) {
                         std::cout << "Linear fit from match:" << std::endl;
 			std::cout << coeff[0] << " " << coeff[1] << " " << coeff[2] << std::endl;
 			std::cout << coeff[3] << " " << coeff[4] << " " << coeff[5] << std::endl;
 			std::cout << coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1. << std::endl;
+			std::cout << theta << std::endl;
 		    }
-		    if (fabs(coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1.) > 0.012 ||
+		    if (((fabs(coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1.) > 0.01 || fabs(theta - 90.) > 0.25) &&
+			 fabs(theta - 90.) > angleDiffFrom90) ||
 			fabs(coeff[0]) > offsetAllowedInPixel || fabs(coeff[3]) > offsetAllowedInPixel) {
 			if (verbose)
 			    std::cout << "Bad; continuing" << std::endl;
