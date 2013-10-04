@@ -117,22 +117,27 @@ def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=T
                 pix = wcs.skyToPixel(s.getCoord())
                 ds9.dot("x", pix[0], pix[1], size=20, frame=frame, ctype=ds9.RED)
 
-def getUndistortedXY0(exposure):
-
-    correctDistortion=not exposure.getWcs().hasDistortion()
-    distorter = None
-    if correctDistortion:
-        try:
-            detector = exposure.getDetector()
-            distorter = detector.getDistortion()
-            def toUndistort(x, y):
-                dist = distorter.undistort(afwGeom.Point2D(x, y), detector)
-                return dist.getX(), dist.getY()
-        except Exception, e:
-            print "WARNING: Unable to use distortion: %s" % e
-            distorter = None
+def getDistorter(exposure):
+    try:
+        detector = exposure.getDetector()
+        distorter = detector.getDistortion()
+        def toUndistort(x, y):
+            dist = distorter.undistort(afwGeom.Point2D(x, y), detector)
+            return dist.getX(), dist.getY()
+        def toDistort(x, y):
+            dist = distorter.distort(afwGeom.Point2D(x, y), detector)
+            return dist.getX(), dist.getY()
+    except Exception, e:
+        print "WARNING: Unable to use distortion: %s" % e
+        distorter = None
     if distorter is None:
-        toUndistort = lambda x,y: (x,y)
+        passThrough = lambda x,y: (x,y)
+        toUndistort = passThrough
+        toDistort = passThrough
+    return toUndistort, toDistort
+
+def getUndistortedXY0(exposure):
+    toUndistort, _ = getDistorter(exposure)
 
     x0, y0 = toUndistort(0,0)
     x1 = x0
@@ -168,6 +173,16 @@ class TaburAstrometry(measAst.Astrometry):
             raise RuntimeError("This matching algorithm requires an input guess WCS")
 
         x0, y0, w, h = getUndistortedXY0(exposure)
+
+        if wcs.hasDistortion():
+            # Need to back out the guestimated distortion already applied in the source positions
+            # because we make use of the WCS which has distortion in it.
+            _, toDistort = getDistorter(exposure)
+            centroidKey = sources.getCentroidKey()
+            for s in sources:
+                center = s.get(centroidKey)
+                x,y = toDistort(center.getX(), center.getY())
+                s.set(centroidKey, afwGeom.Point2D(x, y))
 
         filterName = exposure.getFilter().getName()
         imageSize = (exposure.getWidth(), exposure.getHeight())
@@ -209,9 +224,8 @@ class TaburAstrometry(measAst.Astrometry):
         minNumMatchedPair = min(self.config.minMatchedPairNumber,
                                 int(self.config.minMatchedPairFrac * min([len(cat), len(sources)])))
 
-        correctDistortion=not wcs.hasDistortion()
-        show(debug, exposure, wcs, sources, cat, correctDistortion=correctDistortion,
-             frame=debug.frame1 if isinstance(debug.frame1, int) else 1, title="Input catalog")
+        show(debug, exposure, wcs, sources, cat, frame=debug.frame1 if isinstance(debug.frame1, int) else 1,
+             title="Input catalog")
 
         matchingRadius = self.config.catalogMatchDist / wcs.pixelScale().asArcseconds() # in pixels
 
@@ -271,7 +285,7 @@ class TaburAstrometry(measAst.Astrometry):
             astrom.sipMatches.push_back(m)
 
         if self.config.calculateSip:
-            show(debug, exposure, wcs, sources, cat, matches=matchList, correctDistortion=correctDistortion,
+            show(debug, exposure, wcs, sources, cat, matches=matchList,
                  frame=debug.frame3 if isinstance(debug.frame3, int) else 3, title="SIP matches")
 
         return astrom
