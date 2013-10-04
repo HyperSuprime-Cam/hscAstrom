@@ -43,9 +43,9 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
         dtype=float,
         default=0.02, max=0.1)
     angleDiffFrom90 = RangeField(
-        doc="Angle difference from 90 degree allowed (degree)",
+        doc="Difference of angle between x and y from 90 degree allowed (degree)",
         dtype=float,
-        default=0.05, max=0.20)
+        default=0.05, max=45.0)
     # Set these for proper operation of overridden astrometry class
     useWcsPixelScale = True
     useWcsRaDecCenter = True
