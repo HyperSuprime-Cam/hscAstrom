@@ -51,15 +51,12 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
     useWcsRaDecCenter = True
     useWcsParity = True
 
-def cleanStar(s, ccdId, exposure, correctDistortion):
-    return (numpy.isfinite(s.getX()) and
-            numpy.isfinite(s.getY()))
+def cleanStar(s):
+    return (numpy.isfinite(s.getX()) and numpy.isfinite(s.getY()))
 
 def goodStar(s):
     # FIXME: should use Key to get flag (but then we'd need schema in advance)
-    return (numpy.isfinite(s.getX()) and numpy.isfinite(s.getY()) and
-            not s.getCentroidFlag() and
-            not s.get("flags.pixel.saturated.any"))
+    return (cleanStar(s) and not s.getCentroidFlag() and not s.get("flags.pixel.saturated.any"))
 
 def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=True, frame=1, title=""):
     import lsst.afw.display.ds9 as ds9
@@ -201,7 +198,7 @@ class TaburAstrometry(measAst.Astrometry):
         if self.log: self.log.log(self.log.INFO, "Found %d catalog sources" % len(cat))
         #allSources = sources
         allSources = afwTable.SourceCatalog(sources.table)
-        allSources.extend(s for s in sources if cleanStar(s, exposure.getDetector().getId().getSerial(), exposure, not wcs.hasDistortion()))
+        allSources.extend(s for s in sources if cleanStar(s))
         sources = afwTable.SourceCatalog(sources.table)
         sources.extend(s for s in allSources if goodStar(s))
         
