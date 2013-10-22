@@ -278,7 +278,8 @@ class TaburAstrometry(measAst.Astrometry):
 
         exposure.setWcs(wcs)
 
-        astrom.matchMetadata = measAst.astrom._createMetadata(imageSize[0], imageSize[1], wcs, filterName)
+        astrom.matchMetadata = measAst.astrom._createMetadata(imageSize[0], imageSize[1], x0, y0,
+                                                              wcs, filterName)
         astrom.sipWcs = wcs
         astrom.sipMatches = afwTable.ReferenceMatchVector()
         for m in matchList:
