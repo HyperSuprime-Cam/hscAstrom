@@ -313,18 +313,24 @@ fitTAN(ReferenceMatchVector const &matPair,
     boost::scoped_array<double> u(new double[npair]);
     boost::scoped_array<double> v(new double[npair]);
 
-    double Sra = 0.0;
-    double Sdec = 0.0;
+    double cx = 0.0;
+    double cy = 0.0;
+    double cz = 0.0;
     double Sx = 0.0;
     double Sy = 0.0;
     for (int i = 0; i < npair; i++) {
-        Sra  += matPair[i].first->getRa().asRadians();
-        Sdec += matPair[i].first->getDec().asRadians();
+	lsst::afw::geom::Point3D v = matPair[i].first->getCoord().getVector();
+        cx += v[0];
+	cy += v[1];
+	cz += v[2];
         Sx += matPair[i].second->getX();
         Sy += matPair[i].second->getY();
     }
-    // XXX This may be problematic if we span the RA=0 line or a pole
-    lsst::afw::geom::PointD crval = lsst::afw::geom::Point2D(Sra/npair, Sdec/npair);
+    cx /= npair;
+    cy /= npair;
+    cz /= npair;
+    lsst::afw::coord::Coord cmean(lsst::afw::geom::Point3D(cx, cy, cz));
+    lsst::afw::geom::PointD crval = cmean.getPosition(lsst::afw::geom::radians);
     lsst::afw::geom::PointD crpix = lsst::afw::geom::Point2D(Sx/npair, Sy/npair);
 
     int order = 1;
