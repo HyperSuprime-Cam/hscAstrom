@@ -8,6 +8,7 @@ import lsst.meas.algorithms as measAlg
 import lsst.meas.astrom as measAst
 from . import astromLib as hscAstrom
 from lsst.pex.config import Config, Field, RangeField
+from lsst.meas.photocal.colorterms import Colorterm
 
 class TaburAstrometryConfig(measAst.MeasAstromConfig):
     numBrightStars = RangeField(
@@ -186,7 +187,8 @@ class TaburAstrometry(measAst.Astrometry):
 
         filterName = exposure.getFilter().getName()
         imageSize = (exposure.getWidth(), exposure.getHeight())
-        cat = self.getReferenceSourcesForWcs(wcs, (w,h), filterName, self.config.pixelMargin, x0, y0)
+        cat = self.getReferenceSourcesForWcs(wcs, (w,h), filterName, self.config.pixelMargin, x0, y0,
+                                             allFluxes = (True if Colorterm.getColorterm(filterName) else False))
         # Select unique objects only
         keep = type(cat)(cat.table)
         for c in cat:
