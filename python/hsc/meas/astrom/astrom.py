@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import math, numpy
+import math, numpy, os
 import lsst.daf.base as dafBase
 import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
@@ -8,7 +8,7 @@ import lsst.meas.algorithms as measAlg
 import lsst.meas.astrom as measAst
 from . import astromLib as hscAstrom
 from lsst.pex.config import Config, Field, RangeField
-from lsst.meas.photocal.colorterms import Colorterm
+from lsst.meas.photocal.colorterms import ColortermLibraryConfig
 
 class TaburAstrometryConfig(measAst.MeasAstromConfig):
     numBrightStars = RangeField(
@@ -187,8 +187,18 @@ class TaburAstrometry(measAst.Astrometry):
 
         filterName = exposure.getFilter().getName()
         imageSize = (exposure.getWidth(), exposure.getHeight())
+
+        try:
+            ctermConfig    = os.path.join(os.environ["OBS_SUBARU_DIR"], 'config', 'hsc', 'colorterms.py')
+            ctermLibConfig = ColortermLibraryConfig()
+            ctermLibConfig.load(ctermConfig)
+            cterm = ctermLibConfig.selectColorTerm(filterName)
+        except Exception, e:
+            print e
+            cterm = None
+
         cat = self.getReferenceSourcesForWcs(wcs, (w,h), filterName, self.config.pixelMargin, x0, y0,
-                                             allFluxes = (True if Colorterm.getColorterm(filterName) else False))
+                                             allFluxes = (True if cterm  else False))
         # Select unique objects only
         keep = type(cat)(cat.table)
         for c in cat:
