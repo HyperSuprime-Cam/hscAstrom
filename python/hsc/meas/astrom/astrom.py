@@ -54,9 +54,9 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
 def cleanStar(s):
     return (numpy.isfinite(s.getX()) and numpy.isfinite(s.getY()))
 
-def goodStar(s):
+def goodStar(s, prefix):
     # FIXME: should use Key to get flag (but then we'd need schema in advance)
-    return (cleanStar(s) and not s.getCentroidFlag() and not s.get("flags.pixel.saturated.any"))
+    return (cleanStar(s) and not s.getCentroidFlag() and not s.get(prefix+"flags.pixel.saturated.any"))
 
 def show(debug, exposure, wcs, sources, catalog, matches=[], correctDistortion=True, frame=1, title=""):
     import lsst.afw.display.ds9 as ds9
@@ -213,11 +213,16 @@ class TaburAstrometry(measAst.Astrometry):
         cat = keep
 
         if self.log: self.log.log(self.log.INFO, "Found %d catalog sources" % len(cat))
+
+        # Get measurement prefix
+        psfFluxDef = sources.getTable().getPsfFluxDefinition()
+        prefix = psfFluxDef[:psfFluxDef.find('flux.psf')]
+
         #allSources = sources
         allSources = afwTable.SourceCatalog(sources.table)
         allSources.extend(s for s in sources if cleanStar(s))
         sources = afwTable.SourceCatalog(sources.table)
-        sources.extend(s for s in allSources if goodStar(s))
+        sources.extend(s for s in allSources if goodStar(s, prefix))
         
         if self.log: self.log.log(self.log.INFO, "Matching to %d/%d good input sources" % 
                                   (len(sources), len(allSources)))
@@ -250,16 +255,31 @@ class TaburAstrometry(measAst.Astrometry):
                         return matchList
                 if matchList is not None and len(matchList) != 0:
                     return matchList
-            if matchList is None or len(matchList) == 0:
-                raise RuntimeError("Unable to match sources")
-
-        try:
-            matchList = doMatching(sources)
-        except:
-            if self.log: self.log.info("Matching failed; retrying with saturated sources.")
-            matchList = doMatching(allSources)
         
+        # match sources with staturated, then select unsaturated only 
+        matchList = doMatching(allSources)
+        if matchList is not None:
+            matchList_0 = [m for m in matchList if not m.second.getCentroidFlag() and not m.second.get(prefix+"flags.pixel.saturated.any")]
+        else:
+            matchList_0 = []
+
+        # match sources without saturated
+        matchList_1 = doMatching(sources)
+        if matchList_1 == None:
+            matchList_1 = []
+
+        if len(matchList_0) == 0 and len(matchList_1) == 0:
+            raise RuntimeError("Unable to match sources")
+
+        # Adopt matchList with more matches
+        if len(matchList_0) > len(matchList_1):
+            matchList = matchList_0
+        else:
+            matchList = matchList_1
+
         if self.log: self.log.log(self.log.INFO, "Matched %d sources" % len(matchList))
+        if len(matchList) < minNumMatchedPair:
+            self.log.log(self.log.WARN, "Number of matches is smaller than request")
 
 
         wcs = hscAstrom.fitTAN(matchList, True if debugging else False)

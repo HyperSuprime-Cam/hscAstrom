@@ -421,8 +421,10 @@ hsc::meas::astrom::match(
     std::sort(srcPair.begin(), srcPair.end(), cmpPair);
 
     ReferenceMatchVector matPair;
+    ReferenceMatchVector matPairSave;
+    std::vector<ReferenceMatchVector> matPairCand;
 
-    size_t m = 5;		// Number of objects to define the shape
+    size_t m = 6;		// Number of objects to define the shape
     double e = matchingAllowanceInPixel; // Error allowed for matching
     double e_dpa = rotationAllowedInRad;
     for (size_t ii = 0; ii < srcPair.size(); ii++) {
@@ -574,12 +576,16 @@ hsc::meas::astrom::match(
 			if (matPair.size() <= minNumMatchedPair) {
 			    if (verbose)
 				std::cout << "Insufficient final matches; continuing" << std::endl;
-			    matPair.clear();
+			    if (matPair.size() > matPairSave.size()) {
+			        matPairSave = matPair;
+			    }
 			    continue;
 			} else {
 			    if (verbose)
 				std::cout << "Finish" << std::endl;
-			    return matPair;
+                            matPairCand.push_back(matPair);
+                            if (matPairCand.size() == 3)
+                                goto END;
 			}
 		    }
                 
@@ -587,5 +593,19 @@ hsc::meas::astrom::match(
 	    } // for l
 	} // if
     } // for ii
-    return matPair;
+
+ END:
+    if (matPairCand.size() == 0) {
+        return matPairSave;
+    } else {
+        size_t nmatch = matPairCand[0].size();
+        ReferenceMatchVector matPairRet = matPairCand[0];
+        for (size_t i = 1; i < matPairCand.size(); i++) {
+            if (matPairCand[i].size() > nmatch) {
+                nmatch = matPairCand[i].size();
+                matPairRet = matPairCand[i];
+            }
+        }
+        return matPairRet;
+    }
 }
