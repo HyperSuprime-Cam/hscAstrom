@@ -45,7 +45,7 @@ class TaburAstrometryConfig(measAst.MeasAstromConfig):
     angleDiffFrom90 = RangeField(
         doc="Difference of angle between x and y from 90 degree allowed (degree)",
         dtype=float,
-        default=0.05, max=45.0)
+        default=0.2, max=45.0)
     # Set these for proper operation of overridden astrometry class
     useWcsPixelScale = True
     useWcsRaDecCenter = True
@@ -264,7 +264,10 @@ class TaburAstrometry(measAst.Astrometry):
             matchList_0 = []
 
         # match sources without saturated
-        matchList_1 = doMatching(sources)
+        if len(cat) > len(allSources) - len(sources):
+            matchList_1 = doMatching(sources)
+        else:
+            matchList_1 = []
         if matchList_1 == None:
             matchList_1 = []
 

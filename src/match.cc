@@ -518,7 +518,7 @@ hsc::meas::astrom::match(
 			std::cout << coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1. << std::endl;
 			std::cout << theta << std::endl;
 		    }
-		    if (((fabs(coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1.) > 0.01 || fabs(theta - 90.) > 0.25) &&
+		    if (((fabs(coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1.) > 0.02 || fabs(theta - 90.) > 0.25) &&
 			 fabs(theta - 90.) > angleDiffFrom90) ||
 			fabs(coeff[0]) > offsetAllowedInPixel || fabs(coeff[3]) > offsetAllowedInPixel) {
 			if (verbose)
@@ -545,7 +545,7 @@ hsc::meas::astrom::match(
                                 }
 			    }
 			}
-                        if (num <= 1) {
+                        if (num <= 5) {
                             // Can get matrix = 0,0,0,0; everything matches a single catalog object
                             if (verbose) {
                                 std::cout << "Insufficient initial matches; continuing" << std::endl;
