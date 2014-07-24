@@ -371,6 +371,8 @@ hsc::meas::astrom::match(
     double offsetAllowedInPixel,
     double rotationAllowedInRad,
     double angleDiffFrom90,
+    int numPointsForShape,
+    double limitOnDeterminant,
     bool verbose
 ) {
     // Select brightest Nsub stars from list of objects
@@ -379,9 +381,11 @@ hsc::meas::astrom::match(
     ProxyVector proxyCat = makeProxies(cat, wcs);
     ProxyVector proxySrc = makeProxies(src);
     ProxyVector srcSub = selectPoint(proxySrc, src.getTable()->getApFluxKey(), Nsub);
-    ProxyVector catSub = selectPoint(proxyCat, cat.getSchema().find<double>("flux").key, srcSub.size()+25, catOffset);
-    if (verbose)
+    ProxyVector catSub = selectPoint(proxyCat, cat.getSchema().find<double>("flux").key,
+				     srcSub.size()+25, catOffset);
+    if (verbose) {
 	std::cout << "Catalog sizes: " << srcSub.size() << " " << catSub.size() << std::endl;
+    }
 
     unsigned int catSize = catSub.size();
     unsigned int srcSize = srcSub.size();
@@ -391,13 +395,6 @@ hsc::meas::astrom::match(
     cmp = {src.getTable()->getPsfFluxKey()};
     std::sort(proxySrc.begin(), proxySrc.end(), cmp);
 */
-    /*
-    std::ofstream of("zzz");
-    for (unsigned int i = 0; i < srcSub.size(); i++) {
-	of << srcSub[i].getX() << " " << srcSub[i].getY()<< " " << catSub[i].getX() << " " << catSub[i].getY() << std::endl;
-    }
-    of.close();
-    */
     // Construct a list of Pair of objects in catalog
     std::vector<ProxyPair> catPair;
     for (size_t i = 0; i < catSize-1; i++) {
@@ -424,7 +421,7 @@ hsc::meas::astrom::match(
     ReferenceMatchVector matPairSave;
     std::vector<ReferenceMatchVector> matPairCand;
 
-    size_t m = 6;		// Number of objects to define the shape
+    size_t m = numPointsForShape;        // Number of objects to define the shape
     double e = matchingAllowanceInPixel; // Error allowed for matching
     double e_dpa = rotationAllowedInRad;
     for (size_t ii = 0; ii < srcPair.size(); ii++) {
@@ -499,10 +496,16 @@ hsc::meas::astrom::match(
 
 		    if (verbose) {
 			for (size_t k = 0; k < srcMat.size(); k++) {
-			    std::cout << "circle(" << srcMat[k].getX() << "," << srcMat[k].getY() << ",10) # color=green" << std::endl;
-			    std::cout << "circle(" << catMat[k].getX() << "," << catMat[k].getY() << ",10) # color=red" << std::endl;
-			    std::cout << "line(" << srcMat[0].getX() << "," << srcMat[0].getY() << "," << srcMat[k].getX() << "," << srcMat[k].getY() << ") # line=0 0 color=green" << std::endl;
-			    std::cout << "line(" << catMat[0].getX() << "," << catMat[0].getY() << "," << catMat[k].getX() << "," << catMat[k].getY() << ") # line=0 0 color=red" << std::endl;
+			    std::cout << "circle(" << srcMat[k].getX() << ","
+				      << srcMat[k].getY() << ",10) # color=green" << std::endl;
+			    std::cout << "circle(" << catMat[k].getX() << ","
+				      << catMat[k].getY() << ",10) # color=red" << std::endl;
+			    std::cout << "line(" << srcMat[0].getX() << "," << srcMat[0].getY() << ","
+				      << srcMat[k].getX() << "," << srcMat[k].getY()
+				      << ") # line=0 0 color=green" << std::endl;
+			    std::cout << "line(" << catMat[0].getX() << "," << catMat[0].getY() << ","
+				      << catMat[k].getX() << "," << catMat[k].getY()
+				      << ") # line=0 0 color=red" << std::endl;
 			}
 		    }
 
@@ -518,11 +521,13 @@ hsc::meas::astrom::match(
 			std::cout << coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1. << std::endl;
 			std::cout << theta << std::endl;
 		    }
-		    if (((fabs(coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1.) > 0.02 || fabs(theta - 90.) > 0.25) &&
-			 fabs(theta - 90.) > angleDiffFrom90) ||
-			fabs(coeff[0]) > offsetAllowedInPixel || fabs(coeff[3]) > offsetAllowedInPixel) {
-			if (verbose)
+		    if (fabs(coeff[1] * coeff[5] - coeff[2] * coeff[4] - 1.) > limitOnDeterminant ||
+			fabs(theta - 90.) > angleDiffFrom90 ||
+			fabs(coeff[0]) > offsetAllowedInPixel ||
+			fabs(coeff[3]) > offsetAllowedInPixel) {
+		        if (verbose) {
 			    std::cout << "Bad; continuing" << std::endl;
+			}
 			continue;
 		    } else {
 
@@ -545,7 +550,7 @@ hsc::meas::astrom::match(
                                 }
 			    }
 			}
-                        if (num <= 5) {
+                        if (num <= numPointsForShape) {
                             // Can get matrix = 0,0,0,0; everything matches a single catalog object
                             if (verbose) {
                                 std::cout << "Insufficient initial matches; continuing" << std::endl;
@@ -562,30 +567,26 @@ hsc::meas::astrom::match(
                         }
 
 			matPair = FinalVerify(coeff, proxyCat, proxySrc, matchingAllowanceInPixel, verbose);
-			/*
-			for (int k = 0; k < matPair.size(); k++) {
-			    double flux_cat = matPair[k].first->get(matPair[k].first->getSchema().find<double>("flux").key);
-			    double flux_src = matPair[k].second->get(matPair[k].second->getTable()->getPsfFluxKey());
-			    double delta_mag = 2.5 * log10(flux_src/flux_cat);
-			    std::cout << delta_mag  << std::endl;
-			}
-			*/
-			if (verbose)
+			if (verbose) {
 			    std::cout << "Number of matches: " << matPair.size() << " vs " <<
                                 minNumMatchedPair << std::endl;
+			}
 			if (matPair.size() <= minNumMatchedPair) {
-			    if (verbose)
+			   if (verbose) {
 				std::cout << "Insufficient final matches; continuing" << std::endl;
-			    if (matPair.size() > matPairSave.size()) {
-			        matPairSave = matPair;
-			    }
-			    continue;
+			   }
+			   if (matPair.size() > matPairSave.size()) {
+			       matPairSave = matPair;
+			   }
+			   continue;
 			} else {
-			    if (verbose)
+			    if (verbose) {
 				std::cout << "Finish" << std::endl;
+			    }
                             matPairCand.push_back(matPair);
-                            if (matPairCand.size() == 3)
+                            if (matPairCand.size() == 3) {
                                 goto END;
+			    }
 			}
 		    }
                 

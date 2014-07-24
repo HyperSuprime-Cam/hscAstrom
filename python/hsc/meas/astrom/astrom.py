@@ -6,46 +6,54 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.meas.algorithms as measAlg
 import lsst.meas.astrom as measAst
+import lsst.pex.config as pexConfig
 from . import astromLib as hscAstrom
-from lsst.pex.config import Config, Field, RangeField
 
 class TaburAstrometryConfig(measAst.MeasAstromConfig):
-    numBrightStars = RangeField(
+    numBrightStars = pexConfig.RangeField(
         doc="Number of bright stars to use",
         dtype=int,
         default=50, min=2)
-    minMatchedPairNumber = RangeField(
+    minMatchedPairNumber = pexConfig.RangeField(
         doc="Minimum number of matched pairs",
         dtype=int,
         default=30, min=2)
-    minMatchedPairFrac = RangeField(
+    minMatchedPairFrac = pexConfig.RangeField(
         doc="Minimum number of matched pairs, expressed as a fraction of the reference catalogue size",
         dtype=float,
         default=0.3, min=0, max=1)
-    pixelMargin = RangeField(
+    pixelMargin = pexConfig.RangeField(
         doc="Padding to add to image size (pixels)",
         dtype=int,
         default=50, min=0)
-    calculateSip = Field(
+    calculateSip = pexConfig.Field(
         doc='''Compute polynomial SIP distortion terms?''',
         dtype=bool,
         default=True)
-    sipOrder = RangeField(
+    sipOrder = pexConfig.RangeField(
         doc='''Polynomial order of SIP distortion terms''',
         dtype=int,
         default=4, min=1)
-    offsetAllowedInPixel = RangeField(
+    offsetAllowedInPixel = pexConfig.RangeField(
         doc="Offset between sources and catalog allowed (pixel)",
         dtype=int,
         default=300, max=4000)
-    rotationAllowedInRad = RangeField(
+    rotationAllowedInRad = pexConfig.RangeField(
         doc="Roation angle allowed between sources and catalog (radian)",
         dtype=float,
         default=0.02, max=0.1)
-    angleDiffFrom90 = RangeField(
+    angleDiffFrom90 = pexConfig.RangeField(
         doc="Difference of angle between x and y from 90 degree allowed (degree)",
         dtype=float,
         default=0.2, max=45.0)
+    numPointsForShape = pexConfig.Field(
+        doc="number of points to define a shape for matching",
+        dtype = int,
+        default = 6)
+    limitOnDeterminant = pexConfig.Field(
+        doc="limit on determinant of linear transforming matrix",
+        dtype = float,
+        default = 0.02)
     # Set these for proper operation of overridden astrometry class
     useWcsPixelScale = True
     useWcsRaDecCenter = True
@@ -212,7 +220,7 @@ class TaburAstrometry(measAst.Astrometry):
                 keep.append(c)
         cat = keep
 
-        if self.log: self.log.log(self.log.INFO, "Found %d catalog sources" % len(cat))
+        if self.log: self.log.info("Found %d catalog sources" % len(cat))
 
         # Get measurement prefix
         psfFluxDef = sources.getTable().getPsfFluxDefinition()
@@ -224,8 +232,8 @@ class TaburAstrometry(measAst.Astrometry):
         sources = afwTable.SourceCatalog(sources.table)
         sources.extend(s for s in allSources if goodStar(s, prefix))
         
-        if self.log: self.log.log(self.log.INFO, "Matching to %d/%d good input sources" % 
-                                  (len(sources), len(allSources)))
+        if self.log: self.log.info("Matching to %d/%d good input sources" % 
+                                   (len(sources), len(allSources)))
 
         numBrightStars = max(self.config.numBrightStars, len(sources))
         minNumMatchedPair = min(self.config.minMatchedPairNumber,
@@ -248,7 +256,10 @@ class TaburAstrometry(measAst.Astrometry):
                                                     minNumMatchedPair, matchingRadius,
                                                     len(allSources)-len(sources),
                                                     self.config.offsetAllowedInPixel,
-                                                    e_dpa, self.config.angleDiffFrom90*(k+1), debug.verbose)
+                                                    e_dpa, self.config.angleDiffFrom90*(k+1),
+                                                    self.config.numPointsForShape,
+                                                    self.config.limitOnDeterminant,
+                                                    debug.verbose)
                         if matchList is not None and len(matchList) != 0:
                             return matchList
                     if matchList is not None and len(matchList) != 0:
@@ -259,7 +270,9 @@ class TaburAstrometry(measAst.Astrometry):
         # match sources with staturated, then select unsaturated only 
         matchList = doMatching(allSources)
         if matchList is not None:
-            matchList_0 = [m for m in matchList if not m.second.getCentroidFlag() and not m.second.get(prefix+"flags.pixel.saturated.any")]
+            matchList_0 = [m for m in matchList 
+                           if (not m.second.getCentroidFlag() and 
+                               not m.second.get(prefix+"flags.pixel.saturated.any"))]
         else:
             matchList_0 = []
 
@@ -280,9 +293,9 @@ class TaburAstrometry(measAst.Astrometry):
         else:
             matchList = matchList_1
 
-        if self.log: self.log.log(self.log.INFO, "Matched %d sources" % len(matchList))
+        if self.log: self.log.info("Matched %d sources" % len(matchList))
         if len(matchList) < minNumMatchedPair:
-            self.log.log(self.log.WARN, "Number of matches is smaller than request")
+            self.log.warn("Number of matches is smaller than request")
 
 
         wcs = hscAstrom.fitTAN(matchList, True if debugging else False)

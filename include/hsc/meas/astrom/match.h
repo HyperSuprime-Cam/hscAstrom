@@ -76,6 +76,8 @@ namespace hsc {
         double offsetAllowedInPixel = 300.,
         double rotationAllowdedInRad = 0.02,
         double angleDiffFrom90 = 0.05,
+	int numPointsForShape = 6,
+	double limitOnDeterminant = 0.02,
         bool verbose = false
     );
 
