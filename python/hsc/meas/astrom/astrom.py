@@ -8,6 +8,7 @@ import lsst.meas.algorithms as measAlg
 import lsst.meas.astrom as measAst
 import lsst.pex.config as pexConfig
 from . import astromLib as hscAstrom
+import lsst.afw.cameraGeom as cameraGeom
 
 class TaburAstrometryConfig(measAst.MeasAstromConfig):
     numBrightStars = pexConfig.RangeField(
@@ -175,7 +176,48 @@ class TaburAstrometry(measAst.Astrometry):
         import lsstDebug
         debug = lsstDebug.Info(__name__)
         debugging = lsstDebug.Info(__name__).display
-        
+
+        # Get measurement prefix
+        psfFluxDef = sources.getTable().getPsfFluxDefinition()
+        prefix = psfFluxDef[:psfFluxDef.find('flux.psf')]
+
+        # Distorter to de-apply distortion correction to get sources' centroid
+        # in original pixel coordinate.
+        _, toDistort = getDistorter(exposure)
+        centroidKey = sources.getCentroidKey()
+
+        # For some chips, a few amplifiers are dead.
+        # Reference catalog sources which should be observed on these dead amps
+        # can be contamination when finding astrometric matches.
+        # The following code will find out live amps by checking number of sources
+        # in each amps and determine effective area in pixel coordinate.
+        minX = 9999
+        minY = 9999
+        maxX = -1
+        maxY = -1
+        ccd = cameraGeom.cast_Ccd(exposure.getDetector())
+        for amp in ccd:
+            dataBox = amp.getDataSec(True)
+            xmin, ymin = dataBox.getMin()
+            xmax, ymax = dataBox.getMax()
+            n = 0
+            for s in sources:
+                if cleanStar(s, prefix):
+                    center = s.get(centroidKey)
+                    x, y = toDistort(center.getX(), center.getY())
+                    if x > xmin and x < xmax and y > ymin and y < ymax:
+                        n += 1
+                        break
+            if n != 0:
+                if dataBox.getMinX() < minX:
+                    minX = dataBox.getMinX()
+                if dataBox.getMinY() < minY:
+                    minY = dataBox.getMinY()
+                if dataBox.getMaxX() > maxX:
+                    maxX = dataBox.getMaxX()
+                if dataBox.getMaxY() > maxY:
+                    maxY = dataBox.getMaxY()
+
         wcs = exposure.getWcs() # Guess WCS
         if wcs is None:
             raise RuntimeError("This matching algorithm requires an input guess WCS")
@@ -195,7 +237,10 @@ class TaburAstrometry(measAst.Astrometry):
         filterName = exposure.getFilter().getName()
         imageSize = (exposure.getWidth(), exposure.getHeight())
 
-        cat = self.getReferenceSourcesForWcs(wcs, (w,h), filterName, self.config.pixelMargin, x0, y0)
+        # Find reference catalog only for the effective area.
+        wcs.shiftReferencePixel(-minX, -minY)
+        cat = self.getReferenceSourcesForWcs(wcs, (maxX-minX+1,maxY-minY+1), filterName, self.config.pixelMargin, x0, y0)
+        wcs.shiftReferencePixel(minX, minY)
 
         # Select unique objects only
         keep = type(cat)(cat.table)
@@ -221,10 +266,6 @@ class TaburAstrometry(measAst.Astrometry):
         cat = keep
 
         if self.log: self.log.info("Found %d catalog sources" % len(cat))
-
-        # Get measurement prefix
-        psfFluxDef = sources.getTable().getPsfFluxDefinition()
-        prefix = psfFluxDef[:psfFluxDef.find('flux.psf')]
 
         #allSources = sources
         allSources = afwTable.SourceCatalog(sources.table)
