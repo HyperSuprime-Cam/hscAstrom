@@ -167,22 +167,18 @@ def getUndistortedXY0(exposure):
     return x0, y0, x1-x0, y1-y0
 
 def isAmpDeadWithSources(amp, sources, toDistort, prefix=''):
-    # Check whether specified amp is dead or not
-    # by checking the number of sources in that amp.
+    """ Check whether specified amp is dead or not
+        by checking the number of sources in that amp.
+    """
     centroidKey = sources.getCentroidKey()
     dataBox = afwGeom.Box2D(amp.getDataSec(True))
-    n = 0
     for s in sources:
         if cleanStar(s, prefix):
             center = s.get(centroidKey)
             x, y = toDistort(center.getX(), center.getY())
             if dataBox.contains(afwGeom.Point2D(x,y)):
-                n += 1
-                break
-    if n == 0:
-        return True
-    else:
-        return False
+                return False
+    return True
 
 class TaburAstrometry(measAst.Astrometry):
     """Star matching using algorithm based on V.Tabur 2007, PASA, 24, 189-198
@@ -231,7 +227,7 @@ class TaburAstrometry(measAst.Astrometry):
         ccd = cameraGeom.cast_Ccd(exposure.getDetector())
         for amp in ccd:
             if not isAmpDeadWithSources(amp, sources, toDistort, prefix):
-                if bounds == None:
+                if bounds is None:
                     bounds = amp.getDataSec(True)
                 else:
                     bounds.include(amp.getDataSec(True))
