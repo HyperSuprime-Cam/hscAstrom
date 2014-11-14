@@ -166,6 +166,24 @@ def getUndistortedXY0(exposure):
     
     return x0, y0, x1-x0, y1-y0
 
+def isAmpDeadWithSources(amp, sources, toDistort, prefix=''):
+    # Check whether specified amp is dead or not
+    # by checking the number of sources in that amp.
+    centroidKey = sources.getCentroidKey()
+    dataBox = afwGeom.Box2D(amp.getDataSec(True))
+    n = 0
+    for s in sources:
+        if cleanStar(s, prefix):
+            center = s.get(centroidKey)
+            x, y = toDistort(center.getX(), center.getY())
+            if dataBox.contains(afwGeom.Point2D(x,y)):
+                n += 1
+                break
+    if n == 0:
+        return True
+    else:
+        return False
+
 class TaburAstrometry(measAst.Astrometry):
     """Star matching using algorithm based on V.Tabur 2007, PASA, 24, 189-198
     ("Fast Algorithms for Matching CCD Images to a Stellar Catalogue")
@@ -184,39 +202,6 @@ class TaburAstrometry(measAst.Astrometry):
         # Distorter to de-apply distortion correction to get sources' centroid
         # in original pixel coordinate.
         _, toDistort = getDistorter(exposure)
-        centroidKey = sources.getCentroidKey()
-
-        # For some chips, a few amplifiers are dead.
-        # Reference catalog sources which should be observed on these dead amps
-        # can be contamination when finding astrometric matches.
-        # The following code will find out live amps by checking number of sources
-        # in each amps and determine effective area in pixel coordinate.
-        minX = 9999
-        minY = 9999
-        maxX = -1
-        maxY = -1
-        ccd = cameraGeom.cast_Ccd(exposure.getDetector())
-        for amp in ccd:
-            dataBox = amp.getDataSec(True)
-            xmin, ymin = dataBox.getMin()
-            xmax, ymax = dataBox.getMax()
-            n = 0
-            for s in sources:
-                if cleanStar(s, prefix):
-                    center = s.get(centroidKey)
-                    x, y = toDistort(center.getX(), center.getY())
-                    if x > xmin and x < xmax and y > ymin and y < ymax:
-                        n += 1
-                        break
-            if n != 0:
-                if dataBox.getMinX() < minX:
-                    minX = dataBox.getMinX()
-                if dataBox.getMinY() < minY:
-                    minY = dataBox.getMinY()
-                if dataBox.getMaxX() > maxX:
-                    maxX = dataBox.getMaxX()
-                if dataBox.getMaxY() > maxY:
-                    maxY = dataBox.getMaxY()
 
         wcs = exposure.getWcs() # Guess WCS
         if wcs is None:
@@ -237,10 +222,24 @@ class TaburAstrometry(measAst.Astrometry):
         filterName = exposure.getFilter().getName()
         imageSize = (exposure.getWidth(), exposure.getHeight())
 
+        # For some chips, a few amplifiers are dead.
+        # Reference catalog sources which should be observed on these dead amps
+        # can be contamination when finding astrometric matches.
+        # The following code will find out live amps by checking number of sources
+        # in each amps and determine effective area in pixel coordinate.
+        bounds = None
+        ccd = cameraGeom.cast_Ccd(exposure.getDetector())
+        for amp in ccd:
+            if not isAmpDeadWithSources(amp, sources, toDistort, prefix):
+                if bounds == None:
+                    bounds = amp.getDataSec(True)
+                else:
+                    bounds.include(amp.getDataSec(True))
+
         # Find reference catalog only for the effective area.
-        wcs.shiftReferencePixel(-minX, -minY)
-        cat = self.getReferenceSourcesForWcs(wcs, (maxX-minX+1,maxY-minY+1), filterName, self.config.pixelMargin, x0, y0)
-        wcs.shiftReferencePixel(minX, minY)
+        wcs.shiftReferencePixel(-bounds.getMinX(), -bounds.getMinY())
+        cat = self.getReferenceSourcesForWcs(wcs, bounds.getDimensions(), filterName, self.config.pixelMargin, x0, y0)
+        wcs.shiftReferencePixel(bounds.getMinX(), bounds.getMinY())
 
         # Select unique objects only
         keep = type(cat)(cat.table)
