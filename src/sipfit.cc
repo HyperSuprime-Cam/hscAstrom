@@ -52,12 +52,12 @@ boost::shared_array<double> sipfit(
     boost::scoped_array<double> a_data(new double[ncoeff*ncoeff]);
     boost::scoped_array<double> b_data(new double[ncoeff]);
     boost::scoped_array<double> c_data(new double[ncoeff]);
-    Key< Covariance<Point<float> > > covKey = imgTable.getCentroidErrKey();
+    CovarianceMatrixKey<float,2> covKey = imgTable.getCentroidErrKey();
     for (int i = 0; i < ncoeff; i++) {
 	for (int j = 0; j < ncoeff; j++) {
 	    a_data[i*ncoeff+j] = 0.0;
 	    for (unsigned int k = 0; k < img.size(); k++) {
-		double w = std::sqrt(img[k].record->get(covKey(0,0)));
+		double w = std::sqrt(covKey.getElement(*img[k].record, 0, 0));
 		if (w <= 0.0) w = 1.0;
 		a_data[i*ncoeff+j] += pow(img[k].getX(), xorder[i]) * 
 		                      pow(img[k].getY(), yorder[i]) * 
@@ -72,7 +72,7 @@ boost::shared_array<double> sipfit(
 	//     u = U + F(U)
         //     v = V + G(V)
 	for (unsigned int k = 0; k < img.size(); k++) {
-	    double w = std::sqrt(img[k].record->get(covKey(0,0)));
+	    double w = std::sqrt(covKey.getElement(*img[k].record, 0, 0));
 	    if (w <= 0.0) w = 1.0;
 	    b_data[i] += pow(img[k].getX(), xorder[i]) * 
 		         pow(img[k].getY(), yorder[i]) * 
