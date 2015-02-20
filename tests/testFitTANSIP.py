@@ -24,22 +24,18 @@
 Tests for TanSip
 
 Run with:
-   FitTANSIPWcs.py
-or
-   python
-   >>> import FitTANSIPWcs; FitTANSIPWcs.run()
+   testFitTANSIP.py
 """
+import unittest
 
 if False:
     import matplotlib
     matplotlib.use('Agg')
-    import pylab as plt
+    import pylab
     pnum = 1
+import numpy
 
-import unittest
-import numpy as np
 import lsst.utils.tests as tests
-
 import lsst.afw.coord as afwCoord
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -52,7 +48,7 @@ log = Log.getDefaultLog()
 
 
 class FitTANSIPTestCase(unittest.TestCase):
-    """A test case for FitTANSIPWcs
+    """A test case for fitTANSIP
     """
     def setUp(self):
         self.crCoord = afwCoord.IcrsCoord(afwGeom.PointD(44., 45.))
@@ -74,18 +70,22 @@ class FitTANSIPTestCase(unittest.TestCase):
         srcSchema = afwTable.SourceTable.makeMinimalSchema()
         srcCentroidKey = srcSchema.addField("centroid", type="PointD")
         srcSchema.addField("centroid.flags", type="Flag")
-        srcSchema.addField("centroid.err", type="CovPointF")
+        srcCentroidErrKey = srcSchema.addField("centroid.err", type="CovPointF")
         srcTable = afwTable.SourceTable.make(srcSchema)
         srcTable.defineCentroid("centroid")
         self.matchList = afwTable.ReferenceMatchVector()
 
-        for i in np.linspace(0., S, N):
-            for j in np.linspace(0., S, N):
+        zeroCov = numpy.zeros([2, 2], dtype=numpy.float32)
+        for i in range(2):
+            zeroCov[i,i] = 1
+        for i in numpy.linspace(0., S, N):
+            for j in numpy.linspace(0., S, N):
                 src = srcTable.makeRecord()
                 refObj = posRefTable.makeRecord()
 
                 src.set(srcCentroidKey.getX(), i)
                 src.set(srcCentroidKey.getY(), j)
+                src.set(srcCentroidErrKey, zeroCov)
 
                 c = self.tanWcs.pixelToSky(i, j);
                 refObj.setCoord(c);
@@ -163,7 +163,7 @@ class FitTANSIPTestCase(unittest.TestCase):
 
         tanSipWcs = hscAstrom.fitTANSIP(order, self.matchList, self.crCoord, self.crPix)
 
-        if True:
+        if False:
             md = tanSipWcs.getFitsMetadata()
             for name in md.names():
                 print "%s: %s" % (name, md.get(name))
@@ -188,62 +188,62 @@ class FitTANSIPTestCase(unittest.TestCase):
             srd = tanSipWcs.pixelToSky(src.getX(), src.getY()).toFk5()
             rs.append(srd.getRa())
             ds.append(srd.getDec())
-        xs = np.array(xs)
-        ys = np.array(ys)
-        xc = np.array(xc)
-        yc = np.array(yc)
+        xs = numpy.array(xs)
+        ys = numpy.array(ys)
+        xc = numpy.array(xc)
+        yc = numpy.array(yc)
             
         global pnum
-        plt.clf()
-        plt.plot(xs, ys, 'r.')
-        plt.plot(xc, yc, 'bx')
+        pylab.clf()
+        pylab.plot(xs, ys, 'r.')
+        pylab.plot(xc, yc, 'bx')
         fn = 'check-%i.png' % pnum
-        plt.savefig(fn)
+        pylab.savefig(fn)
         print 'Wrote', fn
         pnum += 1
 
-        plt.clf()
-        plt.plot(xs, xc-xs, 'b.')
+        pylab.clf()
+        pylab.plot(xs, xc-xs, 'b.')
         fn = 'check-%i.png' % pnum
-        plt.xlabel('x(source)')
-        plt.ylabel('x(ref - src)')
-        plt.savefig(fn)
+        pylab.xlabel('x(source)')
+        pylab.ylabel('x(ref - src)')
+        pylab.savefig(fn)
         print 'Wrote', fn
         pnum += 1
 
-        plt.clf()
-        plt.plot(rs, ds, 'r.')
-        plt.plot(rc, dc, 'bx')
+        pylab.clf()
+        pylab.plot(rs, ds, 'r.')
+        pylab.plot(rc, dc, 'bx')
         fn = 'check-%i.png' % pnum
-        plt.savefig(fn)
+        pylab.savefig(fn)
         print 'Wrote', fn
         pnum += 1
 
-        plt.clf()
+        pylab.clf()
         for y in [0., 1000., 2000., 3000., 4000.]:
             x0,y0 = [],[]
             x1,y1 = [],[]
-            for x in np.linspace(0., 4000., 400):
+            for x in numpy.linspace(0., 4000., 400):
                 x0.append(x)
                 y0.append(y)
                 rd = tanSipWcs.pixelToSky(x, y)
                 xy = tanSipWcs.skyToPixel(rd)
                 x1.append(xy[0])
                 y1.append(xy[1])
-            x0 = np.array(x0)
-            x1 = np.array(x1)
-            plt.plot(x0, x1-x0, 'b-')
+            x0 = numpy.array(x0)
+            x1 = numpy.array(x1)
+            pylab.plot(x0, x1-x0, 'b-')
         fn = 'check-%i.png' % pnum
-        plt.savefig(fn)
+        pylab.savefig(fn)
         print 'Wrote', fn
         pnum += 1
 
-        plt.clf()
+        pylab.clf()
         for y in [0., 1000., 2000., 3000., 4000.]:
             x0,y0 = [],[]
             x1,y1 = [],[]
             x2,y2 = [],[]
-            for x in np.linspace(0., 4000., 400):
+            for x in numpy.linspace(0., 4000., 400):
                 x0.append(x)
                 y0.append(y)
                 xy = tanSipWcs.undistortPixel(afwGeom.Point2D(x+1,y+1))
@@ -252,16 +252,16 @@ class FitTANSIPTestCase(unittest.TestCase):
                 xy = tanSipWcs.distortPixel(xy)
                 x2.append(xy[0]-1)
                 y2.append(xy[1]-1)
-            x0 = np.array(x0)
-            x1 = np.array(x1)
-            x2 = np.array(x2)
-            plt.plot(x0, x1-x0, 'b-')
-            plt.plot(x0, x1-x2, 'r-')
-            plt.plot(x0, (x2-x0)*1e5, 'g-')
-        plt.xlabel('x (orig)')
-        plt.ylabel('dx (undistorted)')
+            x0 = numpy.array(x0)
+            x1 = numpy.array(x1)
+            x2 = numpy.array(x2)
+            pylab.plot(x0, x1-x0, 'b-')
+            pylab.plot(x0, x1-x2, 'r-')
+            pylab.plot(x0, (x2-x0)*1e5, 'g-')
+        pylab.xlabel('x (orig)')
+        pylab.ylabel('dx (undistorted)')
         fn = 'check-%i.png' % pnum
-        plt.savefig(fn)
+        pylab.savefig(fn)
         print 'Wrote', fn
         pnum += 1
 
