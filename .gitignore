@@ -5,3 +5,4 @@ python/hsc/meas/astrom/astromLib_wrap.cc
 *.pyc
 python/hsc/meas/astrom/version.py
 ups/hscAstrom.cfgc
+tests/.tests/*
