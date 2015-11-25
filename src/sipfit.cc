@@ -270,7 +270,7 @@ fitTANSIP(int order,
         RecordProxy s2(matPair[i].second, lsst::afw::geom::Point2D(u[i], v[i]));
         img.push_back(s2);
     }
-    coeff = sipfit(order, cat, img, *srcTable);
+    coeff = sipfit(order, img, cat, *srcTable);
     if (verbose) {
 	for (int i = 0; i < ncoeff-2; i++) {
 	    printf("%2d %12.5e %12.5e\n", i, coeff[i], coeff[ncoeff-2+i]);
